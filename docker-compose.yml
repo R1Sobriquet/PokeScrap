@@ -1,0 +1,90 @@
+services:
+  # ---------------------------------------------------------------- db
+  db:
+    image: mysql:8
+    restart: unless-stopped
+    environment:
+      MYSQL_DATABASE: ${DB_NAME}
+      MYSQL_USER: ${DB_USER}
+      MYSQL_PASSWORD: ${DB_PASSWORD}
+      MYSQL_ROOT_PASSWORD: ${DB_ROOT_PASSWORD}
+      TZ: ${APP_TIMEZONE}
+    volumes:
+      - db_data:/var/lib/mysql
+      - ./db/schema.sql:/docker-entrypoint-initdb.d/01-schema.sql:ro
+    healthcheck:
+      test: ["CMD", "mysqladmin", "ping", "-h", "localhost", "-u", "root", "-p${DB_ROOT_PASSWORD}"]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+      start_period: 40s
+    networks:
+      - appnet
+    # Bound to localhost only — never exposed publicly.
+    ports:
+      - "127.0.0.1:${DB_PORT}:3306"
+
+  # ----------------------------------------------------------- backend
+  backend:
+    build: ./backend
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - appnet
+    ports:
+      - "127.0.0.1:${API_PORT}:8000"
+
+  # --------------------------------------------------------- scheduler
+  scheduler:
+    build: ./scheduler
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
+    networks:
+      - appnet
+    # No ports — internal worker only.
+
+  # --------------------------------------------------------------- bot
+  bot:
+    build: ./bot
+    restart: unless-stopped
+    env_file: .env
+    depends_on:
+      - backend
+    networks:
+      - appnet
+    # No ports — outbound Discord gateway only.
+
+  # ----------------------------------------------------------- scraper
+  scraper:
+    build: ./scraper
+    restart: unless-stopped
+    env_file: .env
+    networks:
+      - appnet
+    # No ports — outbound only.
+
+  # ---------------------------------------------------------- frontend
+  frontend:
+    build: ./frontend
+    restart: unless-stopped
+    environment:
+      VITE_API_URL: http://localhost:${API_PORT}
+    depends_on:
+      - backend
+    networks:
+      - appnet
+    ports:
+      - "127.0.0.1:${FRONTEND_PORT}:5173"
+
+networks:
+  appnet:
+    driver: bridge
+
+volumes:
+  db_data:
