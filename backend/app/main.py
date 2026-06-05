@@ -18,7 +18,8 @@ from sqlalchemy import text
 from app.api import api_router
 from app.auth.security import ensure_admin_hash
 from app.config import get_settings
-from app.db import check_db, engine
+from app.db import SessionLocal, check_db, engine
+from app.services.runtime_settings import ensure_runtime_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
 logger = logging.getLogger("backend")
@@ -61,10 +62,12 @@ def verify_schema() -> None:
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
-    logger.info("Démarrage backend — Jalon 1.")
+    logger.info("Démarrage backend.")
     check_db()
     verify_schema()
     ensure_admin_hash()
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
     logger.info("Backend prêt.")
     yield
     logger.info("Arrêt backend.")
