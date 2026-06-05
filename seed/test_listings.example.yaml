@@ -1,0 +1,64 @@
+# =====================================================================
+#  Annonces de test — seed/test_listings.yaml
+# =====================================================================
+# Charge + évalue des annonces à la main (le scraper viendra au Jalon 6) :
+#   python -m app.cli load-test-listings --file /seed/test_listings.yaml
+#
+# ⚠️ Les `product_id` doivent correspondre à des produits déjà seedés
+# (`seed-catalog`) ET ayant des prix ingérés (`refresh-prices`). Ajuste-les
+# après seeding. Le statut réel (flagged/blocked) dépend des prix en base ;
+# les 4 exemples ci-dessous visent chacun une branche du moteur.
+# ---------------------------------------------------------------------
+
+# (1) Devrait PASSER : prix d'achat bas vs revente → ratio <= 50 %.
+- raw_title: "Charizard ex Obsidian Flames 125 - bonne affaire"
+  platform: vinted
+  url: "https://example.test/a"
+  asking_price: 40.00
+  shipping_cost: 3.00
+  protection_cost: 1.00
+  estimated_total_cards: 1
+  detected_products:
+    - product_id: 1
+      qty: 1
+      confidence: 0.95
+
+# (2) Bloquée par le RATIO : prix trop élevé → ratio > 50 %.
+- raw_title: "Charizard ex Obsidian Flames 125 - prix fort"
+  platform: leboncoin
+  url: "https://example.test/b"
+  asking_price: 150.00
+  shipping_cost: 5.00
+  protection_cost: 2.00
+  estimated_total_cards: 1
+  detected_products:
+    - product_id: 1
+      qty: 1
+      confidence: 0.95
+
+# (3) Bloquée par un FILTRE : produit illiquide (faible volume de ventes).
+- raw_title: "Single rare peu liquide"
+  platform: vinted
+  url: "https://example.test/c"
+  asking_price: 20.00
+  shipping_cost: 2.00
+  protection_cost: 1.00
+  estimated_total_cards: 1
+  detected_products:
+    - product_id: 5
+      qty: 1
+      confidence: 0.95
+
+# (4) Lot IR borderline : décote insuffisante → garde-fou IR (hard block).
+- raw_title: "Lot Illustration Rare - décote faible"
+  platform: vinted
+  url: "https://example.test/d"
+  asking_price: 80.00
+  shipping_cost: 4.00
+  protection_cost: 2.00
+  estimated_total_cards: 3
+  detected_products:
+    - product_id: 3
+      qty: 1
+      confidence: 0.95
+      is_illustration_rare: true

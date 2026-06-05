@@ -22,6 +22,7 @@ from app.adapters.poketrace import PokeTracePriceProvider
 from app.config import get_setting
 from app.db import SessionLocal
 from app.services.ingestion import ingest_watchlist_prices
+from app.services.pe_signal_service import run_pe_accumulation_scan
 from app.services.runtime_settings import ensure_runtime_settings
 
 logging.basicConfig(
@@ -53,7 +54,9 @@ def refresh_prices() -> None:
     with SessionLocal() as db:
         ensure_runtime_settings(db)
         written = ingest_watchlist_prices(db, provider=_get_provider())
-    logger.info("refresh_prices: %s snapshots écrits", written)
+        # Une fois les prix rafraîchis, on réévalue le signal d'accumulation PE.
+        pe = run_pe_accumulation_scan(db)
+    logger.info("refresh_prices: %s snapshots écrits ; signal PE=%s", written, pe["fire"])
 
 
 def refresh_history() -> None:

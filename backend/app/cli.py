@@ -4,6 +4,10 @@ Usage (dans le conteneur backend) ::
 
     python -m app.cli seed-catalog --file /seed/watchlist.yaml
     python -m app.cli refresh-prices
+    python -m app.cli record-deposit 150
+    python -m app.cli evaluate-listing 1
+    python -m app.cli load-test-listings --file /seed/test_listings.yaml
+    python -m app.cli pe-scan
 
 ``seed-catalog`` et ``refresh-prices`` requièrent une clé PokeTrace valide
 (``POKETRACE_API_KEY``) car ils appellent l'API réelle.
@@ -12,14 +16,19 @@ Usage (dans le conteneur backend) ::
 from __future__ import annotations
 
 import argparse
+import datetime as dt
 import logging
 import sys
 
 import yaml
 
 from app.db import SessionLocal
+from app.models import SourcingListing
+from app.services.buy_evaluation import evaluate_listing
 from app.services.catalog_seed import seed_catalog
 from app.services.ingestion import ingest_watchlist_prices
+from app.services.pe_signal_service import run_pe_accumulation_scan
+from app.services.portfolio import record_deposit
 from app.services.runtime_settings import ensure_runtime_settings
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] cli: %(message)s")
@@ -49,6 +58,51 @@ def cmd_refresh_prices(args: argparse.Namespace) -> None:
     logger.info("refresh-prices: %s snapshots écrits", written)
 
 
+def cmd_record_deposit(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        tx = record_deposit(db, args.amount)
+    logger.info("record-deposit: +%.2f€ (transaction #%s)", args.amount, tx.id)
+
+
+def cmd_evaluate_listing(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = evaluate_listing(db, args.listing_id)
+    logger.info("evaluate-listing #%s: %s", args.listing_id, result)
+
+
+def cmd_load_test_listings(args: argparse.Namespace) -> None:
+    entries = _load_entries(args.file)
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        for entry in entries:
+            listing = SourcingListing(
+                platform=entry.get("platform", "vinted"),
+                url=entry.get("url", "https://example.test/listing"),
+                raw_title=entry["raw_title"],
+                asking_price=entry["asking_price"],
+                shipping_cost=entry.get("shipping_cost", 0),
+                protection_cost=entry.get("protection_cost", 0),
+                currency=entry.get("currency", "EUR"),
+                location=entry.get("location"),
+                estimated_total_cards=entry.get("estimated_total_cards", 0),
+                detected_products=entry.get("detected_products", []),
+                status="new",
+                detected_at=dt.datetime.now(dt.timezone.utc).replace(tzinfo=None),
+            )
+            db.add(listing)
+            db.commit()
+            result = evaluate_listing(db, listing.id)
+            logger.info("  %s → %s", entry["raw_title"][:50], result["status"])
+
+
+def cmd_pe_scan(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_pe_accumulation_scan(db)
+    logger.info("pe-scan: %s", result)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -59,6 +113,21 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_refresh = sub.add_parser("refresh-prices", help="Ingestion immédiate des prix watchlist")
     p_refresh.set_defaults(func=cmd_refresh_prices)
+
+    p_dep = sub.add_parser("record-deposit", help="Amorce le capital (transaction d'ajustement)")
+    p_dep.add_argument("amount", type=float, help="Montant du dépôt en €")
+    p_dep.set_defaults(func=cmd_record_deposit)
+
+    p_eval = sub.add_parser("evaluate-listing", help="Évalue une annonce existante")
+    p_eval.add_argument("listing_id", type=int)
+    p_eval.set_defaults(func=cmd_evaluate_listing)
+
+    p_load = sub.add_parser("load-test-listings", help="Charge + évalue des annonces de test")
+    p_load.add_argument("--file", default="/seed/test_listings.yaml")
+    p_load.set_defaults(func=cmd_load_test_listings)
+
+    p_pe = sub.add_parser("pe-scan", help="Évalue le signal d'accumulation Prismatic Evolutions")
+    p_pe.set_defaults(func=cmd_pe_scan)
 
     return parser
 

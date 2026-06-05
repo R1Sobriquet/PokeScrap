@@ -5,6 +5,7 @@
 
 # --- Seed personnel (fourni par l'utilisateur ; l'exemple est versionné) ---
 seed/watchlist.yaml
+seed/test_listings.yaml
 
 # --- Python ---
 __pycache__/
