@@ -32,6 +32,9 @@ services:
     depends_on:
       db:
         condition: service_healthy
+    volumes:
+      # Catalogue de seed (watchlist.yaml) — lecture seule, fourni par l'utilisateur.
+      - ./seed:/seed:ro
     networks:
       - appnet
     ports:
@@ -39,7 +42,10 @@ services:
 
   # --------------------------------------------------------- scheduler
   scheduler:
-    build: ./scheduler
+    build:
+      # Construit depuis la racine pour partager ./backend/app.
+      context: .
+      dockerfile: scheduler/Dockerfile
     restart: unless-stopped
     env_file: .env
     depends_on:
