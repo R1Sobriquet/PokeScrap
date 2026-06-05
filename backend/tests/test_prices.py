@@ -16,10 +16,11 @@ def _product(db) -> int:
     return p.id
 
 
-def _snap(db, pid, *, captured_at, condition="NM", grade_company="RAW", grade=None, avg=100):
+def _snap(db, pid, *, captured_at, condition="NM", grade_company="RAW", grade=None,
+          avg=100, marketplace="tcgplayer"):
     db.add(
         PriceSnapshot(
-            product_id=pid, source="poketrace", market="US",
+            product_id=pid, source="poketrace", market="US", marketplace=marketplace,
             grade_company=grade_company, grade=grade, condition_code=condition,
             currency="USD", price_avg=avg, captured_at=captured_at,
         )

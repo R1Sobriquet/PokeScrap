@@ -1,4 +1,4 @@
-"""Adapter PokeTrace (``PriceProvider``) — mode Free/US au Jalon 2.
+"""Adapter PokeTrace (``PriceProvider``) — mode Free/US.
 
 Le client HTTP applique :
   * un **throttle de burst** (intervalle minimal entre requêtes, dérivé de
@@ -7,9 +7,21 @@ Le client HTTP applique :
   * un **backoff exponentiel** sur ``429``.
 
 Le cache anti-gaspillage (TTL sur ``price_snapshots``) est géré côté ingestion,
-au plus près de la base. Les noms de champs de la réponse suivent la doc
-PokeTrace (``avg``, ``low``, ``high``, ``saleCount``, ``approxSaleCount``,
-``avg1d``, ``avg7d``, ``avg30d``) — à reconfirmer contre ``poketrace.com/docs``.
+au plus près de la base.
+
+**Structure de réponse confirmée (pré-vol Jalon 3, cf. docs/jalon3_preflight.md).**
+``GET /cards/{id}`` renvoie un objet ``prices`` **imbriqué par marketplace puis
+par tier** — et non un dict plat de tiers ::
+
+    "prices": {
+      "tcgplayer": { "NEAR_MINT": { "avg": ..., "avg7d": ..., "saleCount": ... } },
+      "ebay":      { "NEAR_MINT": { ... }, "PSA_10": { ... } }
+    }
+
+Cartes US → marketplaces ``tcgplayer`` + ``ebay`` ; cartes EU → ``cardmarket``.
+Les champs d'un point de prix (``avg/low/high/saleCount/approxSaleCount/avg1d/
+avg7d/avg30d``) sont confirmés conformes. ``iter_price_points`` aplatit cette
+structure pour l'ingestion.
 """
 
 from __future__ import annotations
@@ -17,6 +29,7 @@ from __future__ import annotations
 import datetime as dt
 import logging
 import time
+from collections.abc import Iterator
 from typing import Callable
 
 import httpx
@@ -29,6 +42,23 @@ logger = logging.getLogger("adapters.poketrace")
 
 class QuotaExceeded(RuntimeError):
     """Levée quand le budget de requêtes du jour est épuisé."""
+
+
+def iter_price_points(card: dict) -> Iterator[tuple[str, str, dict]]:
+    """Aplatit ``card['prices']`` en triplets ``(marketplace, tier, point)``.
+
+    Tolère l'absence de ``prices`` et ignore les valeurs mal formées (un
+    marketplace ou un point qui ne serait pas un dict).
+    """
+    prices = card.get("prices") or {}
+    if not isinstance(prices, dict):
+        return
+    for marketplace, tiers in prices.items():
+        if not isinstance(tiers, dict):
+            continue
+        for tier, point in tiers.items():
+            if isinstance(point, dict):
+                yield marketplace, tier, point
 
 
 def _utcnow() -> dt.datetime:

@@ -23,6 +23,8 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("price_cache_ttl_min", "360", "int", "Ne pas re-requêter un prix plus jeune que N minutes"),
     ("poketrace_daily_limit", "250", "int", "Quota requêtes/jour PokeTrace (Free 250, Pro 10000)"),
     ("poketrace_min_interval_ms", "2000", "int", "Intervalle min entre requêtes (burst Free 1/2s)"),
+    ("valuation_marketplace", "tcgplayer", "string", "Marketplace de valorisation (tcgplayer|ebay|cardmarket)"),
+    ("fx_usd_eur", "0.92", "decimal", "Conversion proxy US→EUR en mode prototype"),
 ]
 
 

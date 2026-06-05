@@ -4,25 +4,40 @@ from __future__ import annotations
 
 from app.adapters.ports import CertProvider, PriceProvider
 
-# Réponse /cards/{id} conforme à la doc PokeTrace (brut + gradé).
+# Réponse /cards/{id} conforme à la doc PokeTrace : `prices` imbriqué par
+# marketplace puis par tier (carte US → tcgplayer + ebay).
 SAMPLE_CARD = {
     "id": "uuid-charizard",
     "name": "Charizard ex",
     "prices": {
-        "NEAR_MINT": {
-            "avg": 165, "low": 140, "high": 195,
-            "saleCount": 89, "approxSaleCount": False,
-            "avg1d": 162, "avg7d": 160, "avg30d": 155,
+        "tcgplayer": {
+            "NEAR_MINT": {
+                "avg": 165, "low": 140, "high": 195,
+                "saleCount": 89, "approxSaleCount": False,
+                "avg1d": 162, "avg7d": 160, "avg30d": 155,
+            },
+            "LIGHTLY_PLAYED": {
+                "avg": 120, "low": 100, "high": 140,
+                "saleCount": 30, "approxSaleCount": True,
+                "avg1d": 119, "avg7d": 118, "avg30d": 115,
+            },
+            "PSA_10": {
+                "avg": 900, "low": 820, "high": 1000,
+                "saleCount": 12, "approxSaleCount": False,
+                "avg1d": 905, "avg7d": 890, "avg30d": 860,
+            },
         },
-        "LIGHTLY_PLAYED": {
-            "avg": 120, "low": 100, "high": 140,
-            "saleCount": 30, "approxSaleCount": True,
-            "avg1d": 119, "avg7d": 118, "avg30d": 115,
-        },
-        "PSA_10": {
-            "avg": 900, "low": 820, "high": 1000,
-            "saleCount": 12, "approxSaleCount": False,
-            "avg1d": 905, "avg7d": 890, "avg30d": 860,
+        "ebay": {
+            "NEAR_MINT": {
+                "avg": 175, "low": 150, "high": 210,
+                "saleCount": 45, "approxSaleCount": True,
+                "avg1d": 178, "avg7d": 172, "avg30d": 168,
+            },
+            "PSA_10": {
+                "avg": 950, "low": 880, "high": 1100,
+                "saleCount": 8, "approxSaleCount": True,
+                "avg1d": 960, "avg7d": 930, "avg30d": 900,
+            },
         },
     },
 }

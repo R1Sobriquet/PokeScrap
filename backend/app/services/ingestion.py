@@ -20,7 +20,7 @@ import httpx
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.adapters.poketrace import PokeTracePriceProvider, QuotaExceeded
+from app.adapters.poketrace import PokeTracePriceProvider, QuotaExceeded, iter_price_points
 from app.adapters.ports import PriceProvider
 from app.config import get_setting
 from app.models import Alert, PriceSnapshot, Product, Watchlist
@@ -74,10 +74,14 @@ def _snapshot_rows_from_card(
     grading_enabled: bool,
     now: dt.datetime,
 ) -> list[PriceSnapshot]:
-    """Construit les lignes ``price_snapshots`` à partir du détail d'une carte."""
-    prices = card.get("prices") or {}
+    """Construit les lignes ``price_snapshots`` à partir du détail d'une carte.
+
+    L'objet ``prices`` est imbriqué par marketplace puis par tier ; on écrit une
+    ligne par couple ``(marketplace, tier)`` retenu, en renseignant la colonne
+    ``marketplace``.
+    """
     rows: list[PriceSnapshot] = []
-    for tier, p in prices.items():
+    for marketplace, tier, p in iter_price_points(card):
         mapping = map_tier(tier)
         if mapping is None:
             continue
@@ -89,6 +93,7 @@ def _snapshot_rows_from_card(
                 product_id=product_id,
                 source="poketrace",
                 market=market,
+                marketplace=marketplace,
                 grade_company=mapping.grade_company,
                 grade=mapping.grade,
                 condition_code=mapping.condition_code,

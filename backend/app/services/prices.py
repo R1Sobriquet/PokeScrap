@@ -21,19 +21,26 @@ def get_latest_price(
     grade: str | None = None,
     condition: str | None = "NM",
     market: str | None = None,
+    marketplace: str | None = None,
 ) -> PriceSnapshot | None:
     """Renvoie le ``price_snapshots`` le plus récent du tier demandé, ou ``None``.
 
-    Par défaut : tier brut Near Mint, sur le marché du réglage ``valuation_market``.
-    Pour un tier gradé, passer ``grade_company``/``grade`` ; ``condition`` est
+    Par défaut : tier brut Near Mint, sur le marché du réglage ``valuation_market``
+    et le marketplace de valorisation ``valuation_marketplace`` (les prix PokeTrace
+    sont ventilés par marketplace : ``tcgplayer``/``ebay`` en US, ``cardmarket`` en
+    EU). Pour un tier gradé, passer ``grade_company``/``grade`` ; ``condition`` est
     alors ignorée (les lignes gradées ont ``condition_code = NULL``).
     """
     market = market or str(get_setting("valuation_market", default="US"))
+    marketplace = marketplace or str(
+        get_setting("valuation_marketplace", default="tcgplayer")
+    )
 
     stmt = select(PriceSnapshot).where(
         PriceSnapshot.product_id == product_id,
         PriceSnapshot.source == "poketrace",
         PriceSnapshot.market == market,
+        PriceSnapshot.marketplace == marketplace,
         PriceSnapshot.grade_company == grade_company,
     )
 

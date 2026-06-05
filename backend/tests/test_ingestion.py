@@ -34,11 +34,12 @@ def test_free_mode_writes_raw_only(db_session):
 
     written = ingest_prices(db_session, [pid], provider=provider)
 
-    # 2 tiers bruts ingérés (NEAR_MINT, LIGHTLY_PLAYED), le PSA_10 ignoré.
-    assert written == 2
+    # Tiers bruts seulement, ventilés par marketplace : tcgplayer{NM,LP} + ebay{NM}.
+    assert written == 3
     rows = db_session.scalars(select(PriceSnapshot)).all()
-    assert len(rows) == 2
+    assert len(rows) == 3
     assert {r.condition_code for r in rows} == {"NM", "LP"}
+    assert {r.marketplace for r in rows} == {"tcgplayer", "ebay"}
     assert all(r.grade_company == "RAW" for r in rows)
     assert all(r.market == "US" and r.currency == "USD" for r in rows)
     assert all(r.source == "poketrace" for r in rows)
@@ -53,7 +54,10 @@ def test_field_mapping(db_session):
     ingest_prices(db_session, [pid], provider=FakePriceProvider())
 
     nm = db_session.scalar(
-        select(PriceSnapshot).where(PriceSnapshot.condition_code == "NM")
+        select(PriceSnapshot).where(
+            PriceSnapshot.condition_code == "NM",
+            PriceSnapshot.marketplace == "tcgplayer",
+        )
     )
     assert float(nm.price_avg) == 165
     assert float(nm.price_low) == 140
@@ -67,7 +71,7 @@ def test_field_mapping(db_session):
     lp = db_session.scalar(
         select(PriceSnapshot).where(PriceSnapshot.condition_code == "LP")
     )
-    assert lp.approx_sale_count == 1  # approxSaleCount True
+    assert lp.approx_sale_count == 1  # approxSaleCount True (tcgplayer LP)
 
 
 def test_grading_enabled_includes_graded(db_session):
@@ -78,9 +82,13 @@ def test_grading_enabled_includes_graded(db_session):
 
     written = ingest_prices(db_session, [pid], provider=FakePriceProvider())
 
-    assert written == 3
+    # tcgplayer{NM,LP,PSA_10} + ebay{NM,PSA_10} = 5 lignes.
+    assert written == 5
     psa = db_session.scalar(
-        select(PriceSnapshot).where(PriceSnapshot.grade_company == "PSA")
+        select(PriceSnapshot).where(
+            PriceSnapshot.grade_company == "PSA",
+            PriceSnapshot.marketplace == "tcgplayer",
+        )
     )
     assert psa.grade == "10"
     assert psa.condition_code is None
@@ -126,5 +134,5 @@ def test_cache_ttl_refetches_when_stale(db_session):
     provider = FakePriceProvider()
     written = ingest_prices(db_session, [pid], provider=provider, now=now)
 
-    assert written == 2
+    assert written == 3
     assert provider.get_card_calls == [("uuid-charizard", "US")]

@@ -441,4 +441,7 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 -- J2 — Ingestion & garde-quota PokeTrace
 ('price_cache_ttl_min','360','int','Ne pas re-requêter un prix plus jeune que N minutes'),
 ('poketrace_daily_limit','250','int','Quota requêtes/jour PokeTrace (Free 250, Pro 10000)'),
-('poketrace_min_interval_ms','2000','int','Intervalle min entre requêtes (burst Free 1 req/2s, 333 en Pro)');
+('poketrace_min_interval_ms','2000','int','Intervalle min entre requêtes (burst Free 1 req/2s, 333 en Pro)'),
+('valuation_marketplace','tcgplayer','string','Marketplace de valorisation : tcgplayer|ebay (US) | cardmarket (EU)'),
+-- J3 — Moteur d''achat
+('fx_usd_eur','0.92','decimal','Conversion proxy US→EUR en mode prototype ; ignoré en mode EU');
