@@ -1,0 +1,91 @@
+# =====================================================================
+#  Watchlist de départ — seed/watchlist.yaml
+# =====================================================================
+# Copier ce fichier en `seed/watchlist.yaml` puis l'éditer. La commande
+# `python -m app.cli seed-catalog` recherche chaque entrée sur PokeTrace
+# (market US), upsert `products` et `watchlist`.
+#
+# Champs par entrée :
+#   search                 (requis) texte de recherche PokeTrace
+#   name / set / card_number / language / rarity   surcharges optionnelles
+#   product_type           single | sealed         (défaut: single)
+#   tier                   S++ | S | A | B | C      (défaut: B)
+#   is_trinity             true pour Pikachu / Dracaufeu / Noctali
+#   is_illustration_rare   true si Illustration Rare
+#   min_discount_pct       décote minimale visée (garde-fou futur matching)
+#   target_resale_hours    délai de revente visé
+#   priority_coef          coefficient de priorité (défaut: 1.00)
+#   keywords               pipe-séparés, pour le matching de sourcing
+# ---------------------------------------------------------------------
+
+# --- La Trinité S++ -------------------------------------------------
+- search: "Charizard ex Obsidian Flames 125"
+  name: "Charizard ex"
+  set: "Obsidian Flames"
+  card_number: "125"
+  language: EN
+  tier: "S++"
+  is_trinity: true
+  min_discount_pct: 35
+  target_resale_hours: 48
+  priority_coef: 1.50
+  keywords: "charizard|dracaufeu|obsidian flames|125"
+
+- search: "Pikachu ex Surging Sparks 238"
+  name: "Pikachu ex"
+  set: "Surging Sparks"
+  card_number: "238"
+  language: EN
+  tier: "S++"
+  is_trinity: true
+  min_discount_pct: 35
+  target_resale_hours: 48
+  priority_coef: 1.50
+  keywords: "pikachu|surging sparks|238|sar"
+
+- search: "Umbreon ex Prismatic Evolutions 161"
+  name: "Umbreon ex"
+  set: "Prismatic Evolutions"
+  card_number: "161"
+  language: EN
+  tier: "S++"
+  is_trinity: true
+  is_illustration_rare: true
+  min_discount_pct: 35
+  target_resale_hours: 48
+  priority_coef: 1.50
+  keywords: "umbreon|noctali|prismatic|161|moonbreon"
+
+# --- Singles Prismatic Evolutions -----------------------------------
+- search: "Sylveon ex Prismatic Evolutions 156"
+  name: "Sylveon ex"
+  set: "Prismatic Evolutions"
+  card_number: "156"
+  language: EN
+  tier: "S"
+  is_illustration_rare: true
+  min_discount_pct: 30
+  priority_coef: 1.20
+  keywords: "sylveon|nymphali|prismatic|156"
+
+- search: "Espeon ex Prismatic Evolutions 155"
+  name: "Espeon ex"
+  set: "Prismatic Evolutions"
+  card_number: "155"
+  language: EN
+  tier: "A"
+  min_discount_pct: 30
+  priority_coef: 1.10
+  keywords: "espeon|mentali|prismatic|155"
+
+# --- Illustration Rare ----------------------------------------------
+- search: "Iono Paldea Evolved 237"
+  name: "Iono"
+  set: "Paldea Evolved"
+  card_number: "237"
+  language: EN
+  tier: "A"
+  is_illustration_rare: true
+  min_discount_pct: 30
+  priority_coef: 1.10
+  keywords: "iono|paldea evolved|237|ir"

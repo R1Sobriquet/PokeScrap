@@ -3,6 +3,9 @@
 *.env
 !.env.example
 
+# --- Seed personnel (fourni par l'utilisateur ; l'exemple est versionné) ---
+seed/watchlist.yaml
+
 # --- Python ---
 __pycache__/
 *.py[cod]

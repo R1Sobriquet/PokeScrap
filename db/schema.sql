@@ -437,4 +437,8 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 ('valuation_market','US','string','US (prototype) | EU (réel)'),
 ('valuation_condition','NEAR_MINT','string','Condition de valorisation'),
 ('feature_grading_enabled','false','bool','Module grading actif (Pro uniquement)'),
-('feature_history_full','false','bool','Historique quotidien complet (Pro)');
+('feature_history_full','false','bool','Historique quotidien complet (Pro)'),
+-- J2 — Ingestion & garde-quota PokeTrace
+('price_cache_ttl_min','360','int','Ne pas re-requêter un prix plus jeune que N minutes'),
+('poketrace_daily_limit','250','int','Quota requêtes/jour PokeTrace (Free 250, Pro 10000)'),
+('poketrace_min_interval_ms','2000','int','Intervalle min entre requêtes (burst Free 1 req/2s, 333 en Pro)');
