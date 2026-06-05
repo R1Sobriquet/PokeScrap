@@ -47,6 +47,15 @@ class Settings(BaseSettings):
     db_user: str = "app"
     db_password: str = "change_me"
 
+    # --- PokeTrace (clé serveur uniquement, jamais côté frontend) ---
+    poketrace_api_key: str = ""
+    poketrace_base_url: str = "https://api.poketrace.com/v1"
+
+    # --- PSA Public API ---
+    psa_api_username: str = ""
+    psa_api_password: str = ""
+    psa_base_url: str = "https://www.psacard.com/publicapi"
+
     @property
     def database_url(self) -> str:
         return (

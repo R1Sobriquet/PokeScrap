@@ -1,12 +1,150 @@
-"""Adapter PokeTrace (PriceProvider) — STUB Jalon 1."""
+"""Adapter PokeTrace (``PriceProvider``) — mode Free/US au Jalon 2.
+
+Le client HTTP applique :
+  * un **throttle de burst** (intervalle minimal entre requêtes, dérivé de
+    ``poketrace_min_interval_ms``) ;
+  * un **garde-quota journalier** (``poketrace_daily_limit``, reset à minuit UTC) ;
+  * un **backoff exponentiel** sur ``429``.
+
+Le cache anti-gaspillage (TTL sur ``price_snapshots``) est géré côté ingestion,
+au plus près de la base. Les noms de champs de la réponse suivent la doc
+PokeTrace (``avg``, ``low``, ``high``, ``saleCount``, ``approxSaleCount``,
+``avg1d``, ``avg7d``, ``avg30d``) — à reconfirmer contre ``poketrace.com/docs``.
+"""
 
 from __future__ import annotations
 
-from typing import Any
+import datetime as dt
+import logging
+import time
+from typing import Callable
+
+import httpx
 
 from app.adapters.ports import PriceProvider
+from app.config import get_setting, get_settings
+
+logger = logging.getLogger("adapters.poketrace")
+
+
+class QuotaExceeded(RuntimeError):
+    """Levée quand le budget de requêtes du jour est épuisé."""
+
+
+def _utcnow() -> dt.datetime:
+    return dt.datetime.now(dt.timezone.utc)
+
+
+class PokeTraceClient:
+    """Client HTTP bas-niveau, mode-agnostique, avec garde-quota et throttle."""
+
+    def __init__(
+        self,
+        base_url: str,
+        api_key: str,
+        *,
+        daily_limit: int,
+        min_interval_ms: int,
+        http_client: httpx.Client | None = None,
+        monotonic: Callable[[], float] = time.monotonic,
+        sleep: Callable[[float], None] = time.sleep,
+        now: Callable[[], dt.datetime] = _utcnow,
+        max_retries: int = 4,
+    ) -> None:
+        self._base = base_url.rstrip("/")
+        self._key = api_key
+        self._daily_limit = daily_limit
+        self._interval = max(min_interval_ms, 0) / 1000.0
+        self._http = http_client or httpx.Client(timeout=20.0)
+        self._monotonic = monotonic
+        self._sleep = sleep
+        self._now = now
+        self._max_retries = max_retries
+        self._last_request: float | None = None
+        self._count = 0
+        self._day = now().date()
+
+    # -- garde-quota -------------------------------------------------------
+    @property
+    def requests_today(self) -> int:
+        self._reset_if_new_day()
+        return self._count
+
+    def _reset_if_new_day(self) -> None:
+        today = self._now().date()
+        if today != self._day:
+            self._day = today
+            self._count = 0
+
+    def _check_quota(self) -> None:
+        self._reset_if_new_day()
+        if self._count >= self._daily_limit:
+            raise QuotaExceeded(
+                f"Quota PokeTrace atteint ({self._count}/{self._daily_limit} req/jour)"
+            )
+
+    # -- throttle de burst -------------------------------------------------
+    def _throttle(self) -> None:
+        if self._last_request is not None and self._interval > 0:
+            elapsed = self._monotonic() - self._last_request
+            wait = self._interval - elapsed
+            if wait > 0:
+                self._sleep(wait)
+        self._last_request = self._monotonic()
+
+    # -- requête -----------------------------------------------------------
+    def get(self, path: str, params: dict | None = None) -> dict | list:
+        self._check_quota()
+        url = f"{self._base}{path}"
+        backoff = 1.0
+        for _ in range(self._max_retries):
+            self._throttle()
+            self._count += 1
+            resp = self._http.get(url, params=params, headers={"X-API-Key": self._key})
+            if resp.status_code == 429:
+                logger.warning("429 PokeTrace — backoff %.1fs (%s)", backoff, path)
+                self._sleep(backoff)
+                backoff *= 2
+                continue
+            resp.raise_for_status()
+            return resp.json()
+        raise QuotaExceeded(f"429 répétés sur {path}")
 
 
 class PokeTracePriceProvider(PriceProvider):
-    def get_price(self, product_ref: str, **kwargs: Any) -> Any:
-        raise NotImplementedError("jalon 2")
+    """Implémentation ``PriceProvider`` adossée à ``PokeTraceClient``."""
+
+    def __init__(self, client: PokeTraceClient | None = None) -> None:
+        if client is None:
+            settings = get_settings()
+            client = PokeTraceClient(
+                settings.poketrace_base_url,
+                settings.poketrace_api_key,
+                daily_limit=int(get_setting("poketrace_daily_limit", default=250)),
+                min_interval_ms=int(get_setting("poketrace_min_interval_ms", default=2000)),
+            )
+        self._client = client
+
+    @property
+    def client(self) -> PokeTraceClient:
+        return self._client
+
+    def search_cards(self, query: str, *, market: str, limit: int = 20) -> list[dict]:
+        data = self._client.get(
+            "/cards", params={"search": query, "market": market, "limit": limit}
+        )
+        if isinstance(data, list):
+            return data
+        return data.get("cards", [])
+
+    def get_card(self, card_id: str, *, market: str) -> dict:
+        data = self._client.get(f"/cards/{card_id}", params={"market": market})
+        return data  # type: ignore[return-value]
+
+    def get_price_history(self, card_id: str, tier: str, *, market: str) -> list[dict]:
+        data = self._client.get(
+            f"/cards/{card_id}/prices/{tier}/history", params={"market": market}
+        )
+        if isinstance(data, list):
+            return data
+        return data.get("history", [])
