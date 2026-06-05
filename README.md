@@ -9,8 +9,39 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 >
 > **Jalon 2 — Socle données.** Adapters réels derrière les ports (PokeTrace,
 > PSA), ingestion des prix vers `price_snapshots`, seeding du catalogue/watchlist,
-> et service de lecture `get_latest_price`. **Toujours aucune logique de décision**
-> (règle des 50 %, filtres, moteur de vente → Jalon 3+).
+> et service de lecture `get_latest_price`.
+>
+> **Jalon 3 — Moteur d'achat (`domain/`).** Toute la logique d'achat en
+> **fonctions pures, zéro I/O** : paliers + garde-fou cash, règle des 50 % nette,
+> valorisation de lot mixte, filtres anti-erreurs, scoring, signal d'accumulation
+> PE. L'orchestration (couche application) fait l'I/O et écrit les alertes en base
+> (`status='pending'` — l'envoi Discord arrive au Jalon 4). **Pas encore de moteur
+> de vente / KPIs / scraping** (jalons 5-6).
+
+## Jalon 3 — moteur d'achat
+
+> **Pré-vol PokeTrace** : la structure de réponse a été vérifiée et corrigée avant
+> de coder le moteur — voir [`docs/jalon3_preflight.md`](docs/jalon3_preflight.md)
+> et le smoke-test `python scripts/smoke_poketrace.py`.
+
+`domain/` (pur) : `tiers.py`, `valuation.py`, `buying.py`, `filters.py`,
+`pe_signal.py`. L'orchestration `services/buy_evaluation.py::evaluate_listing`
+rassemble prix + portefeuille + réglages, appelle le domaine, puis écrit le statut
+de l'annonce (`flagged`/`blocked`) et l'alerte `buy` pending — en une transaction.
+
+```bash
+# Amorcer le capital (ton dépôt initial)
+docker compose exec backend python -m app.cli record-deposit 150
+
+# Évaluer des annonces de test (le scraper viendra au Jalon 6)
+cp seed/test_listings.example.yaml seed/test_listings.yaml   # ajuster les product_id
+docker compose exec backend python -m app.cli load-test-listings --file /seed/test_listings.yaml
+
+# Ou via l'API (JWT) : POST /listings {raw_title, asking_price, detected_products, ...}
+```
+
+Nouveaux réglages : `valuation_marketplace` (tcgplayer/cardmarket) et `fx_usd_eur`
+(conversion proxy US→EUR du mode prototype).
 
 ## Jalon 2 — couche données
 
