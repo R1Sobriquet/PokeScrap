@@ -5,19 +5,25 @@ tables exploitées par les jalons en cours (le reste viendra au fil des jalons).
 """
 
 from app.models.alert import Alert
+from app.models.position import Position
 from app.models.price_snapshot import PriceSnapshot
 from app.models.product import Product
 from app.models.psa_cert import PsaCert
 from app.models.setting import Setting
+from app.models.sourcing_listing import SourcingListing
 from app.models.tier import TierConfig
+from app.models.transaction import Transaction
 from app.models.watchlist import Watchlist
 
 __all__ = [
     "Alert",
+    "Position",
     "PriceSnapshot",
     "Product",
     "PsaCert",
     "Setting",
+    "SourcingListing",
     "TierConfig",
+    "Transaction",
     "Watchlist",
 ]
