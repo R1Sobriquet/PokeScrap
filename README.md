@@ -1,14 +1,54 @@
-# Pokémon Arbitrage & Portfolio — Jalon 1 (Fondations)
+# Pokémon Arbitrage & Portfolio
 
 Application personnelle, mono-utilisateur, auto-hébergée d'aide à la décision pour
 l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 
-> **Jalon 1 = fondations uniquement.** Toute la plomberie et la topologie sont en
-> place : les 6 services tournent ensemble, la base est créée et seedée,
-> l'authentification fonctionne, et chaque service prouve qu'il est branché.
-> **Aucune logique métier** (la règle des 50 %, les filtres, le moteur de vente,
-> l'ingestion de prix, le scraping réel, les KPIs arrivent aux jalons 2+). Les
-> adapters externes sont des stubs qui lèvent `NotImplementedError("jalon 2")`.
+> **Jalon 1 — Fondations.** Plomberie et topologie : les 6 services tournent
+> ensemble, la base est créée et seedée, l'authentification fonctionne, chaque
+> service prouve qu'il est branché.
+>
+> **Jalon 2 — Socle données.** Adapters réels derrière les ports (PokeTrace,
+> PSA), ingestion des prix vers `price_snapshots`, seeding du catalogue/watchlist,
+> et service de lecture `get_latest_price`. **Toujours aucune logique de décision**
+> (règle des 50 %, filtres, moteur de vente → Jalon 3+).
+
+## Jalon 2 — couche données
+
+### Modes pilotés par `settings` (zéro changement de code)
+
+| Réglage | Prototype (actuel) | Réel (Pro) |
+|---|---|---|
+| `poketrace_plan` | `free` | `pro` |
+| `valuation_market` | `US` | `EU` |
+| `feature_grading_enabled` | `false` | `true` |
+| `feature_history_full` | `false` | `true` |
+
+Passer en Pro = éditer ces lignes en base (`UPDATE settings …`). L'adapter les lit
+via `get_setting()`. Garde-quota : `poketrace_daily_limit` (250 Free),
+`poketrace_min_interval_ms` (burst), `price_cache_ttl_min` (cache anti-gaspillage).
+
+### Seeder le catalogue
+
+```bash
+cp seed/watchlist.example.yaml seed/watchlist.yaml   # puis éditer
+docker compose exec backend python -m app.cli seed-catalog --file /seed/watchlist.yaml
+```
+
+### Ingestion des prix
+
+- Automatique : job scheduler `refresh_prices` (cron `JOB_REFRESH_PRICES`).
+- Manuelle : `docker compose exec backend python -m app.cli refresh-prices`.
+
+### Routes de lecture (JWT requis)
+
+```
+GET /products
+GET /watchlist
+GET /products/{id}/prices/latest?grade_company=RAW&condition=NM
+```
+
+> Le scheduler partage la couche données du backend (`backend/app`) : son image
+> est construite depuis la racine du repo (`context: .`).
 
 ## Architecture — ports & adapters (hexagonale)
 
