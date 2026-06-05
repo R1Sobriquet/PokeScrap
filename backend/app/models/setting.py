@@ -4,16 +4,16 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import BigInteger, DateTime, Enum, String, func
+from sqlalchemy import DateTime, Enum, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
-from app.db import Base
+from app.db import Base, BigIntPK
 
 
 class Setting(Base):
     __tablename__ = "settings"
 
-    id: Mapped[int] = mapped_column(BigInteger, primary_key=True, autoincrement=True)
+    id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
     setting_key: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
     setting_value: Mapped[str] = mapped_column(String(255), nullable=False)
     value_type: Mapped[str] = mapped_column(

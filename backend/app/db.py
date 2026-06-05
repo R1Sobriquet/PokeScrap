@@ -4,10 +4,14 @@ from __future__ import annotations
 
 from collections.abc import Iterator
 
-from sqlalchemy import create_engine, text
+from sqlalchemy import BigInteger, Integer, create_engine, text
 from sqlalchemy.orm import DeclarativeBase, Session, sessionmaker
 
 from app.config import get_settings
+
+#: Clé primaire : ``BIGINT`` en production (MySQL, comme ``schema.sql``), mais
+#: ``INTEGER`` sous SQLite pour bénéficier de l'auto-increment natif en test.
+BigIntPK = BigInteger().with_variant(Integer, "sqlite")
 
 _settings = get_settings()
 
