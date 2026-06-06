@@ -104,6 +104,28 @@ def _palier_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ..
     return embed, buttons
 
 
+_SELL_ACTIONABLE = {"sell_x2", "sell_25_50_25", "sell_forced"}
+
+
+def _sell_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ...]]:
+    fields = [
+        EmbedField("Multiple", f"×{payload.get('multiple', '—')}"),
+        EmbedField("Prix unitaire", f"{_money(payload.get('mv_unit'))} €"),
+        EmbedField("Qté suggérée", str(payload.get("qty_suggested", "—"))),
+    ]
+    embed = EmbedSpec(
+        title=f"💸 Vente — {alert.title}",
+        description=payload.get("message"),
+        color=SEVERITY_COLORS.get(alert.severity, SEVERITY_COLORS["warning"]),
+        fields=tuple(fields),
+        footer=_footer(alert.created_at),
+    )
+    buttons = (
+        ButtonSpec("Exécutée", style=STYLE_PRIMARY, custom_id=f"alert:{alert.id}:action:executed"),
+    )
+    return embed, buttons
+
+
 def _generic_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ...]]:
     embed = EmbedSpec(
         title=alert.title,
@@ -123,8 +145,10 @@ def render_alert(alert) -> RenderedAlert:
     payload = alert.payload or {}
     if alert.alert_type == "buy":
         embed, buttons = _buy_embed(alert, payload)
+    elif alert.alert_type in _SELL_ACTIONABLE:
+        embed, buttons = _sell_embed(alert, payload)
     elif alert.alert_type in ("palier_up", "palier_down"):
         embed, buttons = _palier_embed(alert, payload)
-    else:  # tech_error et autres : embed sans bouton
+    else:  # tech_error, sell_reminder, reinvest… : embed sans bouton
         embed, buttons = _generic_embed(alert, payload)
     return RenderedAlert(channel_key=channel_for(alert.alert_type), embed=embed, buttons=buttons)

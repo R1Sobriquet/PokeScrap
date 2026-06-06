@@ -22,8 +22,10 @@ from app.adapters.poketrace import PokeTracePriceProvider
 from app.config import get_setting
 from app.db import SessionLocal
 from app.services.ingestion import ingest_watchlist_prices
+from app.services.kpi_snapshot import run_kpi_snapshot
 from app.services.pe_signal_service import run_pe_accumulation_scan
 from app.services.runtime_settings import ensure_runtime_settings
+from app.services.selling_service import evaluate_position_sales
 
 logging.basicConfig(
     level=logging.INFO, format="%(asctime)s [%(levelname)s] scheduler: %(message)s"
@@ -33,6 +35,7 @@ logger = logging.getLogger("scheduler")
 TIMEZONE = os.getenv("APP_TIMEZONE", "Europe/Paris")
 JOB_REFRESH_PRICES = os.getenv("JOB_REFRESH_PRICES", "0 6 * * *")
 JOB_REFRESH_HISTORY = os.getenv("JOB_REFRESH_HISTORY", "0 4 * * *")
+JOB_KPI_SNAPSHOT = os.getenv("JOB_KPI_SNAPSHOT", "55 23 * * *")
 
 # Provider persistant : son compteur de quota journalier survit entre les runs
 # tant que le process scheduler vit (reset interne à minuit UTC).
@@ -54,9 +57,19 @@ def refresh_prices() -> None:
     with SessionLocal() as db:
         ensure_runtime_settings(db)
         written = ingest_watchlist_prices(db, provider=_get_provider())
-        # Une fois les prix rafraîchis, on réévalue le signal d'accumulation PE.
+        # Une fois les prix rafraîchis : signal PE + évaluation des ventes.
         pe = run_pe_accumulation_scan(db)
-    logger.info("refresh_prices: %s snapshots écrits ; signal PE=%s", written, pe["fire"])
+        sells = evaluate_position_sales(db)
+    logger.info(
+        "refresh_prices: %s snapshots ; PE=%s ; ventes=%s", written, pe["fire"], sells["sell"]
+    )
+
+
+def kpi_snapshot() -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_kpi_snapshot(db)
+    logger.info("kpi_snapshot: %s", result)
 
 
 def refresh_history() -> None:
@@ -80,11 +93,17 @@ def main() -> None:
         CronTrigger.from_crontab(JOB_REFRESH_HISTORY, timezone=TIMEZONE),
         id="refresh_history",
     )
+    scheduler.add_job(
+        kpi_snapshot,
+        CronTrigger.from_crontab(JOB_KPI_SNAPSHOT, timezone=TIMEZONE),
+        id="kpi_snapshot",
+    )
     logger.info(
-        "Scheduler démarré (tz=%s, refresh_prices='%s', refresh_history='%s').",
+        "Scheduler démarré (tz=%s, refresh_prices='%s', refresh_history='%s', kpi_snapshot='%s').",
         TIMEZONE,
         JOB_REFRESH_PRICES,
         JOB_REFRESH_HISTORY,
+        JOB_KPI_SNAPSHOT,
     )
     try:
         scheduler.start()

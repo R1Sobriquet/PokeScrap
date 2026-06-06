@@ -26,6 +26,7 @@ from app.services.interactions import (
     handle_ignore,
     handle_palier_confirm,
     handle_palier_later,
+    handle_sell_executed,
 )
 from app.services.runtime_settings import ensure_runtime_settings
 
@@ -72,6 +73,16 @@ def _default_price(alert_id: int) -> float:
     return 0.0
 
 
+def _sell_defaults(alert_id: int) -> tuple[float, int]:
+    """(prix unitaire suggéré, qté suggérée) pour pré-remplir le modal de vente."""
+    with SessionLocal() as db:
+        alert = db.get(Alert, alert_id)
+        if alert:
+            payload = alert.payload or {}
+            return float(payload.get("mv_unit") or 0), int(payload.get("qty_suggested") or 1)
+    return 0.0, 1
+
+
 def _run(fn, *args, **kwargs):
     with SessionLocal() as db:
         return fn(db, *args, **kwargs)
@@ -106,6 +117,41 @@ class BoughtModal(discord.ui.Modal, title="Achat enregistré"):
         await interaction.response.send_message(msg, ephemeral=True)
 
 
+# --------------------------------------------------------------- modal vente
+class SellModal(discord.ui.Modal, title="Vente exécutée"):
+    def __init__(self, alert_id: int, default_unit: float, default_qty: int):
+        super().__init__()
+        self.alert_id = alert_id
+        self.gross = discord.ui.TextInput(
+            label="Montant brut encaissé (€)", default=f"{default_unit * default_qty:.2f}"
+        )
+        self.fees = discord.ui.TextInput(label="Frais (€)", default="0", required=False)
+        self.qty = discord.ui.TextInput(label="Quantité vendue", default=str(default_qty))
+        self.add_item(self.gross)
+        self.add_item(self.fees)
+        self.add_item(self.qty)
+
+    async def on_submit(self, interaction: discord.Interaction) -> None:
+        try:
+            gross = float(str(self.gross.value).replace(",", "."))
+            fees = float(str(self.fees.value or "0").replace(",", "."))
+            qty = int(str(self.qty.value))
+        except ValueError:
+            await interaction.response.send_message("Saisie invalide.", ephemeral=True)
+            return
+        res = await asyncio.to_thread(
+            _run, handle_sell_executed, self.alert_id, gross_amount=gross, fees=fees, qty=qty
+        )
+        if res["status"] == "already_processed":
+            msg = "Déjà traité."
+        elif res["status"] == "ok":
+            msg = (f"✅ Vente enregistrée : {res['qty_sold']} u, net {res['net_amount']:.2f} €, "
+                   f"profit {res['profit']:.2f} € (verrouillé {res['locked']:.2f} €).")
+        else:
+            msg = "Position ou alerte introuvable."
+        await interaction.response.send_message(msg, ephemeral=True)
+
+
 # --------------------------------------------------------- handler de clics
 @client.event
 async def on_interaction(interaction: discord.Interaction) -> None:
@@ -123,6 +169,11 @@ async def on_interaction(interaction: discord.Interaction) -> None:
     if action == "bought":
         default_price = await asyncio.to_thread(_default_price, alert_id)
         await interaction.response.send_modal(BoughtModal(alert_id, default_price))
+        return
+
+    if action == "executed":
+        unit, qty = await asyncio.to_thread(_sell_defaults, alert_id)
+        await interaction.response.send_modal(SellModal(alert_id, unit, qty))
         return
 
     if action == "ignore":

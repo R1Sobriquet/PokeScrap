@@ -27,9 +27,12 @@ from app.models import SourcingListing
 from app.services.buy_evaluation import evaluate_listing
 from app.services.catalog_seed import seed_catalog
 from app.services.ingestion import ingest_watchlist_prices
+from app.services.kpi_snapshot import run_kpi_snapshot
+from app.services.ledger import compute_kpis
 from app.services.pe_signal_service import run_pe_accumulation_scan
 from app.services.portfolio import record_deposit
 from app.services.runtime_settings import ensure_runtime_settings
+from app.services.selling_service import evaluate_position_sales
 
 logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] cli: %(message)s")
 logger = logging.getLogger("cli")
@@ -103,6 +106,26 @@ def cmd_pe_scan(args: argparse.Namespace) -> None:
     logger.info("pe-scan: %s", result)
 
 
+def cmd_evaluate_sales(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = evaluate_position_sales(db)
+    logger.info("evaluate-sales: %s", result)
+
+
+def cmd_kpis(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("kpis: %s", compute_kpis(db))
+
+
+def cmd_kpi_snapshot(args: argparse.Namespace) -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_kpi_snapshot(db)
+    logger.info("kpi-snapshot: %s", result)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -128,6 +151,15 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_pe = sub.add_parser("pe-scan", help="Évalue le signal d'accumulation Prismatic Evolutions")
     p_pe.set_defaults(func=cmd_pe_scan)
+
+    p_sales = sub.add_parser("evaluate-sales", help="Émet les alertes de vente (moteur S5)")
+    p_sales.set_defaults(func=cmd_evaluate_sales)
+
+    p_kpis = sub.add_parser("kpis", help="Affiche les 5 KPIs + cascade de trésorerie")
+    p_kpis.set_defaults(func=cmd_kpis)
+
+    p_snap = sub.add_parser("kpi-snapshot", help="Écrit le snapshot KPI + transitions de palier")
+    p_snap.set_defaults(func=cmd_kpi_snapshot)
 
     return parser
 
