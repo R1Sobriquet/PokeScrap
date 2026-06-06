@@ -14,9 +14,38 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 > **Jalon 3 — Moteur d'achat (`domain/`).** Toute la logique d'achat en
 > **fonctions pures, zéro I/O** : paliers + garde-fou cash, règle des 50 % nette,
 > valorisation de lot mixte, filtres anti-erreurs, scoring, signal d'accumulation
-> PE. L'orchestration (couche application) fait l'I/O et écrit les alertes en base
-> (`status='pending'` — l'envoi Discord arrive au Jalon 4). **Pas encore de moteur
-> de vente / KPIs / scraping** (jalons 5-6).
+> PE. L'orchestration (couche application) fait l'I/O et écrit les alertes en base.
+>
+> **Jalon 4 — Discord & exécution.** Les alertes deviennent réelles et
+> interactives : un dispatcher (boucle dans le process bot) pousse les
+> `alerts(pending)` selon `notify_mode=balanced` (critical+ping / warning / digest
+> info), en respectant quiet_hours / dedup / cooldown. Boutons `buy` → [Voir]
+> [Acheté] (modal → lot+transaction) [Ignorer]. **Pas encore de moteur de vente /
+> KPIs / scraping** (jalons 5-6).
+
+## Jalon 4 — Discord & exécution
+
+> **Pré-vol** : discord.py 2.x — voir [`docs/jalon4_preflight.md`](docs/jalon4_preflight.md).
+
+Architecture découplée : le **dispatcher** (`services/alert_dispatcher.py`) et les
+**handlers d'interaction** (`services/interactions.py`) sont du backend pur (testés
+sans Discord) ; ils produisent des specs neutres (`app/notifications/`). Seuls
+l'adapter `adapters/discord_notifier.py` et `bot/bot.py` importent discord.py.
+
+| Type d'alerte | Salon | Boutons |
+|---|---|---|
+| `buy` | #achats | Voir · Acheté (modal) · Ignorer |
+| `sell_*` | #ventes | (Jalon 5) |
+| `palier_*` / `grading` / `reinvest` / `tax_provision` | #portefeuille | Confirmer/Plus tard (palier, inerte jusqu'au J5) |
+| `tech_error` | #systeme | — |
+
+**Run réel** (premier jalon observable de bout en bout) : avec `DISCORD_BOT_TOKEN`
++ `POKETRACE_API_KEY` dans `.env`, faire une fois `docker compose up` →
+`record-deposit 150` → `evaluate-listing` → l'alerte d'achat arrive dans #achats →
+clic [Acheté] + modal → `lots`/`transactions` se remplissent, le cash baisse.
+Sans token : le bot logge « Discord non configuré, dispatch en dry-run ».
+
+Nouveau réglage : `dispatcher_poll_sec` (période de la boucle d'envoi).
 
 ## Jalon 3 — moteur d'achat
 

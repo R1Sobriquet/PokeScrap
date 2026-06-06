@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from app.adapters.ports import CertProvider, PriceProvider
+from app.adapters.ports import CertProvider, Notifier, PriceProvider
 
 # Réponse /cards/{id} conforme à la doc PokeTrace : `prices` imbriqué par
 # marketplace puis par tier (carte US → tcgplayer + ebay).
@@ -74,3 +74,16 @@ class FakeCertProvider(CertProvider):
     def verify_cert(self, cert_number: str) -> dict:
         self.calls.append(cert_number)
         return self.data
+
+
+class FakeNotifier(Notifier):
+    """Notifier espion : enregistre les envois, ne touche pas Discord."""
+
+    def __init__(self):
+        self.sent: list[dict] = []
+
+    def send(self, channel_key: str, embed, buttons=(), *, ping: bool = False):
+        self.sent.append(
+            {"channel": channel_key, "embed": embed, "buttons": tuple(buttons), "ping": ping}
+        )
+        return len(self.sent)
