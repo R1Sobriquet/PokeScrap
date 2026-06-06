@@ -22,11 +22,39 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 > (modal → lot+transaction) [Ignorer].
 >
 > **Jalon 5 — Moteur de vente & KPIs.** Vente en fonctions pures (hiérarchie
-> **forcé > x2 > 25/50/25**, idempotente par `stage_*`), comptabilité (cascade de
-> trésorerie, **30/70**, 5 KPIs, provision fiscale 12,3 % informative), et job de
-> snapshot KPI quotidien qui **active les transitions de palier** (`palier_up`
-> confirmable / `palier_down` auto). **Pas encore de scraping / dashboard**
-> (jalons 6, 8).
+> **forcé > x2 > 25/50/25**, idempotente par `stage_*`), comptabilité (cascade,
+> **30/70**, 5 KPIs, provision fiscale), et snapshot KPI quotidien qui pilote les
+> transitions de palier.
+>
+> **Jalon 6 — Scraping (sourcing).** Collecte automatique d'annonces
+> Vinted/LeBoncoin (conteneur Playwright **isolé, sortant, best-effort**) →
+> `sourcing_listings` (dédup) → matching mots-clés → `evaluate_listing` (J3). Aucun
+> contournement anti-bot : bloqué = stop + `tech_error` + backoff. **Pas encore de
+> dashboard** (jalon 8).
+
+## Jalon 6 — scraping & sourcing
+
+> **Pré-vol** : sélecteurs externalisés + détection de casse — voir
+> [`docs/jalon6_preflight.md`](docs/jalon6_preflight.md).
+
+- **Posture** : scraping poli de listings publics. **Aucun** contournement
+  (CAPTCHA / fingerprint / proxies d'évasion). Sur blocage → `tech_error` + backoff.
+- **Sélecteurs** : tous dans `scraper/selectors.yaml` (zéro sélecteur en dur). La
+  détection de casse (`selector_break_threshold`) alerte au lieu d'insérer du vide.
+- **Pipeline** (`scrape_sourcing`, cron `SCRAPE_INTERVAL_MIN`) : collecte → dédup
+  `(platform, external_id)` → matching (`services/matching.py`) → `evaluate_listing`.
+- **Isolation** : le conteneur scraper est best-effort ; une panne n'affecte ni les
+  prix ni les KPIs. **PII minimale**, rétention `sourcing_retention_days` (purge auto).
+- **Session** : cookies optionnels via `.env` (`SCRAPE_VINTED_COOKIES`…), sinon
+  anonyme. Jamais d'identifiants en clair.
+
+```bash
+docker compose exec backend python -m app.cli purge-sourcing   # purge manuelle
+# La collecte tourne dans le conteneur scraper (Playwright) à l'intervalle .env.
+```
+
+Nouveaux réglages : `scrape_max_listings_per_run`, `scrape_blocked_cooldown_min`,
+`selector_break_threshold`, `saved_queries`.
 
 ## Jalon 5 — vente & comptabilité
 

@@ -126,6 +126,15 @@ def cmd_kpi_snapshot(args: argparse.Namespace) -> None:
     logger.info("kpi-snapshot: %s", result)
 
 
+def cmd_purge_sourcing(args: argparse.Namespace) -> None:
+    from app.services.sourcing import purge_old_sourcing
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        purged = purge_old_sourcing(db)
+    logger.info("purge-sourcing: %s annonces supprimées", purged)
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -160,6 +169,9 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_snap = sub.add_parser("kpi-snapshot", help="Écrit le snapshot KPI + transitions de palier")
     p_snap.set_defaults(func=cmd_kpi_snapshot)
+
+    p_purge = sub.add_parser("purge-sourcing", help="Purge les annonces dismissed/expired anciennes")
+    p_purge.set_defaults(func=cmd_purge_sourcing)
 
     return parser
 
