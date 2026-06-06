@@ -260,6 +260,8 @@ def evaluate_listing(db: Session, listing_id: int) -> dict:
                     "score": round(score, 4),
                     "ratio_pct": buy.ratio_pct,
                     "estimated_resale_value": buy.resale_value,
+                    "acquisition_cost_total": round(listing_input.acquisition_cost_total, 2),
+                    "listing_url": listing.url,
                     "is_trinity": is_trinity,
                     "tier": tier,
                     "value_proxy": market == "US",
