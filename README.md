@@ -28,9 +28,43 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 >
 > **Jalon 6 — Scraping (sourcing).** Collecte automatique d'annonces
 > Vinted/LeBoncoin (conteneur Playwright **isolé, sortant, best-effort**) →
-> `sourcing_listings` (dédup) → matching mots-clés → `evaluate_listing` (J3). Aucun
-> contournement anti-bot : bloqué = stop + `tech_error` + backoff. **Pas encore de
-> dashboard** (jalon 8).
+> `sourcing_listings` (dédup) → matching mots-clés → `evaluate_listing` (J3).
+>
+> **Jalon 7 — Liquidation (Module B) & Grading (Module A).** Intake d'un lot
+> acheté → segmentation (individuelles routées + **lots vrac sans doublon**) →
+> prix suggérés ; `promote_to_position` (pont vers le moteur de vente J5).
+> Comparateur de grading **pondéré** (gated Pro) + **authenticité PSA** (gratuite,
+> tous modes). **Pas encore de dashboard / durcissement** (J8/J9).
+
+## Jalon 7 — liquidation & grading
+
+> **Pré-vol PSA** : forme réelle de l'API confirmée/corrigée —
+> [`docs/jalon7_preflight.md`](docs/jalon7_preflight.md), `scripts/smoke_psa.py`.
+
+**Module B** (`domain/liquidation.py` pur + `services/liquidation_service.py`) :
+- `intake-lot` pré-remplit `lot_items` depuis la détection ; l'utilisateur corrige.
+- `segment-lot` : `< individual_threshold` → vrac ; sinon individuelle routée
+  (gradé/≥50€ → eBay, sinon Cardmarket). **Packing vrac sans doublon** garanti
+  (`n ≥ max_copies`). Prix suggérés ; alerte `lot_summary`.
+- `promote-item` : crée une `positions` (avg_cost pro-rata du coût du lot) — **seul
+  pont B → portefeuille**, ensuite suivi par le moteur de vente J5.
+
+**Module A** (`domain/grading.py` pur + `services/grading_service.py`) :
+- `grading-scan` (hebdo) : espérance pondérée par les probas de grade ; **no-op
+  propre hors mode Pro** (`feature_grading_enabled`). Payload honnête (coût élevé,
+  capital immobilisé, biais de survie du pop report → défaut conservateur).
+- `verify-cert` / `verify_slab` : **gratuit, tous modes**. Cert invalide →
+  HARD_BLOCK ; valide → WARN (« cohérent ✔, inspection requise » — jamais
+  « authentique garanti »). Hook : une annonce au cert invalide est bloquée avant
+  l'achat.
+
+```bash
+docker compose exec backend python -m app.cli intake-lot 1
+docker compose exec backend python -m app.cli segment-lot 1
+docker compose exec backend python -m app.cli promote-item 5
+docker compose exec backend python -m app.cli verify-cert 12345678
+docker compose exec backend python -m app.cli grading-scan
+```
 
 ## Jalon 6 — scraping & sourcing
 
