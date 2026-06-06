@@ -15,7 +15,7 @@ from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.domain.types import PortfolioState
-from app.models import Position, Transaction
+from app.models import Lot, Position, Transaction
 
 
 def _utcnow() -> dt.datetime:
@@ -23,15 +23,20 @@ def _utcnow() -> dt.datetime:
 
 
 def portfolio_state(db: Session) -> PortfolioState:
-    invested = db.scalar(
+    invested_positions = db.scalar(
         select(func.coalesce(func.sum(Position.avg_cost * Position.quantity), 0))
+    )
+    # Coût des lots ouverts (achetés mais pas encore éclatés en positions) : il
+    # compte dans le capital investi tant que le lot n'est pas liquidé.
+    invested_lots = db.scalar(
+        select(func.coalesce(func.sum(Lot.total_cost), 0)).where(Lot.status != "liquidated")
     )
     cash_total = db.scalar(
         select(func.coalesce(func.sum(Transaction.net_amount), 0))
     )
     return PortfolioState(
         cash_active=float(cash_total or 0),
-        capital_invested=float(invested or 0),
+        capital_invested=float(invested_positions or 0) + float(invested_lots or 0),
         cash_locked=0.0,
     )
 

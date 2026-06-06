@@ -5,6 +5,7 @@ tables exploitées par les jalons en cours (le reste viendra au fil des jalons).
 """
 
 from app.models.alert import Alert
+from app.models.lot import Lot
 from app.models.position import Position
 from app.models.price_snapshot import PriceSnapshot
 from app.models.product import Product
@@ -17,6 +18,7 @@ from app.models.watchlist import Watchlist
 
 __all__ = [
     "Alert",
+    "Lot",
     "Position",
     "PriceSnapshot",
     "Product",
