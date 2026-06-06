@@ -18,10 +18,34 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 >
 > **Jalon 4 — Discord & exécution.** Les alertes deviennent réelles et
 > interactives : un dispatcher (boucle dans le process bot) pousse les
-> `alerts(pending)` selon `notify_mode=balanced` (critical+ping / warning / digest
-> info), en respectant quiet_hours / dedup / cooldown. Boutons `buy` → [Voir]
-> [Acheté] (modal → lot+transaction) [Ignorer]. **Pas encore de moteur de vente /
-> KPIs / scraping** (jalons 5-6).
+> `alerts(pending)` selon `notify_mode=balanced`. Boutons `buy` → [Voir] [Acheté]
+> (modal → lot+transaction) [Ignorer].
+>
+> **Jalon 5 — Moteur de vente & KPIs.** Vente en fonctions pures (hiérarchie
+> **forcé > x2 > 25/50/25**, idempotente par `stage_*`), comptabilité (cascade de
+> trésorerie, **30/70**, 5 KPIs, provision fiscale 12,3 % informative), et job de
+> snapshot KPI quotidien qui **active les transitions de palier** (`palier_up`
+> confirmable / `palier_down` auto). **Pas encore de scraping / dashboard**
+> (jalons 6, 8).
+
+## Jalon 5 — vente & comptabilité
+
+`domain/` (pur) : `selling.py` (hiérarchie de conflits, idempotence par `stage_*`)
+et `accounting.py` (cascade, 30/70, KPIs). Orchestration `services/` :
+`selling_service` émet les alertes `sell_*`, `ledger.compute_kpis` calcule les 5
+KPIs, `kpi_snapshot` écrit `account_snapshots` + pilote les paliers.
+
+```bash
+docker compose exec backend python -m app.cli evaluate-sales   # émet les alertes de vente
+docker compose exec backend python -m app.cli kpis             # affiche les 5 KPIs
+docker compose exec backend python -m app.cli kpi-snapshot     # snapshot + transitions de palier
+```
+
+Flux de vente : alerte `sell_*` → bouton **[Exécutée]** → modal (brut, frais, qté)
+→ `transactions(sell)` + `cost_basis`, position mise à jour, `stage_*` posé
+(**uniquement à l'exécution**), 30/70 appliqué (`cash_locked` monte, jamais ne
+baisse). Atomique et idempotent. Les transitions de palier réutilisent le
+framework bouton du Jalon 4 (`palier_up` → [Confirmer] applique la promotion).
 
 ## Jalon 4 — Discord & exécution
 
