@@ -17,8 +17,11 @@ de données (mode prototype US gratuit vs réel EU payant).
 
 Jalon 3 : logique d'achat (paliers/cash, règle des 50 %, valorisation de lot,
 filtres anti-erreurs, scoring, signal d'accumulation PE).
+Jalon 5 : logique de vente (hiérarchie x2 / 25-50-25 / forcé) et comptabilité
+(cascade de trésorerie, 30/70, KPIs, provision fiscale).
 """
 
+from app.domain import accounting
 from app.domain.buying import evaluate_buy, opportunity_score
 from app.domain.filters import (
     anti_pump_block,
@@ -35,11 +38,17 @@ from app.domain.tiers import (
     evaluate_tier_transition,
     resolve_current_tier,
 )
+from app.domain.selling import (
+    discipline_reminder,
+    sell_engine,
+    speculation_signal,
+)
 from app.domain.valuation import estimate_lot_resale_net, is_IR_lot, net_value
 from app.domain import types
 
 __all__ = [
     "types",
+    "accounting",
     # tiers & cash
     "resolve_current_tier",
     "cash_min_pct",
@@ -60,4 +69,8 @@ __all__ = [
     "passes_S4",
     # PE
     "pe_accumulation_signal",
+    # selling (S5)
+    "sell_engine",
+    "speculation_signal",
+    "discipline_reminder",
 ]

@@ -112,3 +112,26 @@ class PEAccumulationResult:
     fire: bool
     trigger_count: int
     triggers: tuple[str, ...]
+
+
+# --------------------------------------------------------------- vente (S5)
+@dataclass(frozen=True)
+class SellPosition:
+    """État d'une position vu par le moteur de vente."""
+
+    quantity: int
+    avg_cost: float
+    stage_capital_secured: bool = False
+    stage_structured: bool = False
+    stage_forced: bool = False
+
+
+@dataclass(frozen=True)
+class SellDecision:
+    action: str  # voir constantes selling.*
+    qty_to_sell: int = 0
+    speculative_reserve_qty: int = 0
+    stages_to_set: tuple[str, ...] = ()
+    keeps_wick: bool = False
+    severity: str = "warning"
+    reason: str | None = None
