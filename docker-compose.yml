@@ -57,11 +57,15 @@ services:
 
   # --------------------------------------------------------------- bot
   bot:
-    build: ./bot
+    build:
+      # Construit depuis la racine pour partager ./backend/app (dispatcher, services).
+      context: .
+      dockerfile: bot/Dockerfile
     restart: unless-stopped
     env_file: .env
     depends_on:
-      - backend
+      db:
+        condition: service_healthy
     networks:
       - appnet
     # No ports — outbound Discord gateway only.
