@@ -59,9 +59,17 @@ class SourcingProvider(ABC):
 
 
 class Notifier(ABC):
-    """Canal de notification sortant (ex. Discord)."""
+    """Canal de notification sortant (ex. Discord).
+
+    Reçoit des specs neutres (``EmbedSpec`` / ``ButtonSpec``) ; l'adapter concret
+    les traduit vers son SDK. Le ``channel_key`` logique (``achats``/``ventes``/
+    ``portefeuille``/``systeme``) est résolu en id réel par l'adapter.
+    """
 
     @abstractmethod
-    def notify(self, channel: str, message: str, **kwargs: Any) -> Any:
-        """Envoie un message sur un canal donné."""
+    def send(self, channel_key: str, embed: Any, buttons: Any = (), *, ping: bool = False) -> Any:
+        """Envoie un message (embed + boutons) sur un salon logique.
+
+        ``ping=True`` mentionne l'utilisateur (alertes critiques).
+        """
         raise NotImplementedError
