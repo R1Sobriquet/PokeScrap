@@ -1,0 +1,39 @@
+# =====================================================================
+#  Sélecteurs CSS externalisés (Jalon 6) — AUCUN sélecteur en dur ailleurs.
+# =====================================================================
+# ⚠️ Les structures de Vinted/LeBoncoin changent souvent : ces sélecteurs sont
+# une HYPOTHÈSE de départ best-effort, à VÉRIFIER/METTRE À JOUR sur le HTML réel
+# (cf. docs/jalon6_preflight.md). La détection de casse (selector_break_threshold)
+# émettra une alerte tech_error « sélecteurs à mettre à jour » plutôt que d'insérer
+# du vide.
+#
+# Clés par plateforme :
+#   search_url        : gabarit d'URL de recherche, {query} = requête URL-encodée
+#   container         : sélecteur d'une carte d'annonce (répété)
+#   title/price/...   : sélecteurs RELATIFS à la carte
+#   link              : <a> portant le href de l'annonce
+#   external_id_attr  : (optionnel) attribut de la carte contenant l'id ; sinon
+#                       l'id est extrait du href (plus longue suite de chiffres)
+#   base_url          : pour résoudre les href relatifs
+
+vinted:
+  base_url: "https://www.vinted.fr"
+  search_url: "https://www.vinted.fr/catalog?search_text={query}&order=newest_first"
+  container: "div.feed-grid__item"
+  title: "[data-testid$='--description-title'], .new-item-box__title"
+  price: "[data-testid$='--price-text'], .new-item-box__price"
+  shipping: "[data-testid$='--total-price'] .web_ui__Text__subtitle"
+  location: ".new-item-box__country"
+  link: "a.new-item-box__overlay, a[href*='/items/']"
+  external_id_attr: ""
+
+leboncoin:
+  base_url: "https://www.leboncoin.fr"
+  search_url: "https://www.leboncoin.fr/recherche?text={query}&sort=time"
+  container: "article[data-test-id='ad'], a[data-test-id='ad']"
+  title: "[data-test-id='adcard-title'], p[data-qa-id='aditem_title']"
+  price: "[data-test-id='price'], span[data-qa-id='aditem_price']"
+  shipping: "[data-test-id='shipping']"
+  location: "[aria-label='Localisation'], p[data-qa-id='aditem_location']"
+  link: "a[href*='/ad/'], a[href*='.htm']"
+  external_id_attr: ""

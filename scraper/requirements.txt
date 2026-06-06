@@ -1,0 +1,3 @@
+# Playwright (paquet + navigateurs) est fourni par l'image de base.
+# Le code partagé du backend est installé via backend/requirements.txt (Dockerfile).
+APScheduler==3.11.0

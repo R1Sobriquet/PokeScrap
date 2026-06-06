@@ -72,9 +72,15 @@ services:
 
   # ----------------------------------------------------------- scraper
   scraper:
-    build: ./scraper
+    build:
+      # Construit depuis la racine pour partager ./backend/app (sourcing, matching).
+      context: .
+      dockerfile: scraper/Dockerfile
     restart: unless-stopped
     env_file: .env
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
       - appnet
     # No ports — outbound only.
