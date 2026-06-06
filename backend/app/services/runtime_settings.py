@@ -26,6 +26,10 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("valuation_marketplace", "tcgplayer", "string", "Marketplace de valorisation (tcgplayer|ebay|cardmarket)"),
     ("fx_usd_eur", "0.92", "decimal", "Conversion proxy US→EUR en mode prototype"),
     ("dispatcher_poll_sec", "20", "int", "Période de la boucle d'envoi des alertes (secondes)"),
+    ("scrape_max_listings_per_run", "40", "int", "Plafond d'annonces traitées par run de scraping"),
+    ("scrape_blocked_cooldown_min", "120", "int", "Cooldown max (min) après blocage plateforme"),
+    ("selector_break_threshold", "30", "int", "% de cartes sans champ obligatoire = structure cassée"),
+    ('saved_queries', '["lot cartes pokemon","display prismatic evolutions"]', "json", "Requêtes de sourcing sauvegardées"),
 ]
 
 
