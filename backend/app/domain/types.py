@@ -135,3 +135,34 @@ class SellDecision:
     keeps_wick: bool = False
     severity: str = "warning"
     reason: str | None = None
+
+
+# --------------------------------------------- liquidation (S6, Module B)
+@dataclass(frozen=True)
+class LiquidationCard:
+    """Une carte identifiée du pool vrac (un product_id, qty exemplaires)."""
+
+    product_id: int
+    qty: int
+    theme: str
+
+
+@dataclass(frozen=True)
+class BulkBin:
+    """Un lot vrac : produits distincts (sans doublon) + taille en cartes."""
+
+    label: str
+    product_ids: tuple[int, ...]
+    size: int
+
+
+# --------------------------------------------------- grading (S8, Module A)
+@dataclass(frozen=True)
+class GradingResult:
+    raw_net: float
+    expected_net: float
+    grading_cost: float
+    uplift: float
+    uplift_pct: float
+    grade_probability: dict
+    is_recommended: bool

@@ -23,6 +23,8 @@ Jalon 5 : logique de vente (hiérarchie x2 / 25-50-25 / forcé) et comptabilité
 
 from app.domain import accounting
 from app.domain.buying import evaluate_buy, opportunity_score
+from app.domain.grading import grade_probability, grading_uplift, slab_verdict
+from app.domain.liquidation import build_bulk_lots, classify_segmentation, route_individual
 from app.domain.filters import (
     anti_pump_block,
     fomo_block,
@@ -73,4 +75,12 @@ __all__ = [
     "sell_engine",
     "speculation_signal",
     "discipline_reminder",
+    # liquidation (S6)
+    "classify_segmentation",
+    "route_individual",
+    "build_bulk_lots",
+    # grading (S8)
+    "grade_probability",
+    "grading_uplift",
+    "slab_verdict",
 ]
