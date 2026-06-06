@@ -444,4 +444,6 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 ('poketrace_min_interval_ms','2000','int','Intervalle min entre requêtes (burst Free 1 req/2s, 333 en Pro)'),
 ('valuation_marketplace','tcgplayer','string','Marketplace de valorisation : tcgplayer|ebay (US) | cardmarket (EU)'),
 -- J3 — Moteur d''achat
-('fx_usd_eur','0.92','decimal','Conversion proxy US→EUR en mode prototype ; ignoré en mode EU');
+('fx_usd_eur','0.92','decimal','Conversion proxy US→EUR en mode prototype ; ignoré en mode EU'),
+-- J4 — Dispatcher Discord
+('dispatcher_poll_sec','20','int','Période de la boucle d''envoi des alertes (secondes)');

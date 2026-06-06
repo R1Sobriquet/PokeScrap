@@ -25,6 +25,7 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("poketrace_min_interval_ms", "2000", "int", "Intervalle min entre requêtes (burst Free 1/2s)"),
     ("valuation_marketplace", "tcgplayer", "string", "Marketplace de valorisation (tcgplayer|ebay|cardmarket)"),
     ("fx_usd_eur", "0.92", "decimal", "Conversion proxy US→EUR en mode prototype"),
+    ("dispatcher_poll_sec", "20", "int", "Période de la boucle d'envoi des alertes (secondes)"),
 ]
 
 
