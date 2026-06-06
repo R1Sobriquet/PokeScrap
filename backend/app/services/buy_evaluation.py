@@ -11,6 +11,7 @@ from __future__ import annotations
 
 import datetime as dt
 import logging
+import re
 
 from sqlalchemy import select
 from sqlalchemy.orm import Session
@@ -145,12 +146,42 @@ def _value_driver(detected, prices, params: ValuationParams):
     return best
 
 
+_CERT_RE = re.compile(r"psa[^0-9]{0,8}(\d{7,9})", re.IGNORECASE)
+
+
+def _detect_cert_number(listing: SourcingListing) -> str | None:
+    """Numéro de cert PSA détecté dans les produits détectés ou le titre."""
+    for item in listing.detected_products or []:
+        if isinstance(item, dict) and item.get("cert_number"):
+            return str(item["cert_number"])
+    match = _CERT_RE.search(listing.raw_title or "")
+    return match.group(1) if match else None
+
+
 # ----------------------------------------------------------- orchestration
-def evaluate_listing(db: Session, listing_id: int) -> dict:
-    """Évalue une annonce et persiste son statut (+ alerte si elle passe)."""
+def evaluate_listing(db: Session, listing_id: int, *, cert_provider=None) -> dict:
+    """Évalue une annonce et persiste son statut (+ alerte si elle passe).
+
+    Si un n° de cert est détecté et qu'un ``cert_provider`` est fourni, l'annonce
+    est d'abord vérifiée (J7) : cert invalide → bloquée avant toute validation.
+    """
     listing = db.get(SourcingListing, listing_id)
     if listing is None:
         raise ValueError(f"sourcing_listing {listing_id} introuvable")
+
+    # Garde-fou authenticité : un slab au cert invalide est bloqué d'emblée.
+    cert_number = _detect_cert_number(listing)
+    if cert_number and cert_provider is not None:
+        from app.services.grading_service import verify_slab
+
+        verdict = verify_slab(db, cert_number, provider=cert_provider)
+        if verdict["decision"] == "hard_block":
+            listing.status = "blocked"
+            listing.filter_flags = {"cert_invalid": True, "cert_number": cert_number}
+            listing.evaluated_at = _utcnow()
+            db.commit()
+            return {"listing_id": listing_id, "status": "blocked", "reason": "cert_invalid",
+                    "cert_number": cert_number}
 
     market = str(get_setting("valuation_market", default="US"))
     params = _valuation_params(market)

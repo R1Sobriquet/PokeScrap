@@ -135,6 +135,46 @@ def cmd_purge_sourcing(args: argparse.Namespace) -> None:
     logger.info("purge-sourcing: %s annonces supprimées", purged)
 
 
+def cmd_intake_lot(args: argparse.Namespace) -> None:
+    from app.services.liquidation_service import intake_lot
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("intake-lot #%s: %s", args.lot_id, intake_lot(db, args.lot_id))
+
+
+def cmd_segment_lot(args: argparse.Namespace) -> None:
+    from app.services.liquidation_service import segment_lot
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("segment-lot #%s: %s", args.lot_id, segment_lot(db, args.lot_id))
+
+
+def cmd_promote_item(args: argparse.Namespace) -> None:
+    from app.services.liquidation_service import promote_to_position
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("promote-item #%s: %s", args.item_id, promote_to_position(db, args.item_id))
+
+
+def cmd_grading_scan(args: argparse.Namespace) -> None:
+    from app.services.grading_service import run_grading_scan
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("grading-scan: %s", run_grading_scan(db))
+
+
+def cmd_verify_cert(args: argparse.Namespace) -> None:
+    from app.services.grading_service import verify_slab
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("verify-cert %s: %s", args.cert_number, verify_slab(db, args.cert_number))
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -172,6 +212,25 @@ def build_parser() -> argparse.ArgumentParser:
 
     p_purge = sub.add_parser("purge-sourcing", help="Purge les annonces dismissed/expired anciennes")
     p_purge.set_defaults(func=cmd_purge_sourcing)
+
+    p_intake = sub.add_parser("intake-lot", help="Pré-remplit lot_items depuis la détection")
+    p_intake.add_argument("lot_id", type=int)
+    p_intake.set_defaults(func=cmd_intake_lot)
+
+    p_seg = sub.add_parser("segment-lot", help="Segmente un lot (individuelles + vrac sans doublon)")
+    p_seg.add_argument("lot_id", type=int)
+    p_seg.set_defaults(func=cmd_segment_lot)
+
+    p_prom = sub.add_parser("promote-item", help="Promeut un lot_item en position suivie")
+    p_prom.add_argument("item_id", type=int)
+    p_prom.set_defaults(func=cmd_promote_item)
+
+    p_grade = sub.add_parser("grading-scan", help="Scan grading (no-op hors mode Pro)")
+    p_grade.set_defaults(func=cmd_grading_scan)
+
+    p_cert = sub.add_parser("verify-cert", help="Vérifie l'authenticité d'un cert PSA")
+    p_cert.add_argument("cert_number")
+    p_cert.set_defaults(func=cmd_verify_cert)
 
     return parser
 

@@ -21,6 +21,7 @@ from apscheduler.triggers.cron import CronTrigger
 from app.adapters.poketrace import PokeTracePriceProvider
 from app.config import get_setting
 from app.db import SessionLocal
+from app.services.grading_service import run_grading_scan
 from app.services.ingestion import ingest_watchlist_prices
 from app.services.kpi_snapshot import run_kpi_snapshot
 from app.services.pe_signal_service import run_pe_accumulation_scan
@@ -72,6 +73,13 @@ def kpi_snapshot() -> None:
     logger.info("kpi_snapshot: %s", result)
 
 
+def grading_scan() -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_grading_scan(db)
+    logger.info("grading_scan: %s", result)
+
+
 def refresh_history() -> None:
     if not bool(get_setting("feature_history_full", default=False)):
         logger.info("refresh_history différé : mode Free")
@@ -98,8 +106,14 @@ def main() -> None:
         CronTrigger.from_crontab(JOB_KPI_SNAPSHOT, timezone=TIMEZONE),
         id="kpi_snapshot",
     )
+    # Grading hebdo (no-op propre hors mode Pro) : lundi 03:00.
+    scheduler.add_job(
+        grading_scan,
+        CronTrigger(day_of_week="mon", hour=3, minute=0, timezone=TIMEZONE),
+        id="grading_scan",
+    )
     logger.info(
-        "Scheduler démarré (tz=%s, refresh_prices='%s', refresh_history='%s', kpi_snapshot='%s').",
+        "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly).",
         TIMEZONE,
         JOB_REFRESH_PRICES,
         JOB_REFRESH_HISTORY,
