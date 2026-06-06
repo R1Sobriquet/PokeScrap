@@ -1,12 +1,10 @@
-"""Adapter de sourcing (SourcingProvider) — STUB Jalon 1."""
+"""Provider de sourcing — note d'architecture.
 
-from __future__ import annotations
+Les implémentations concrètes (Playwright) vivent dans le conteneur ``scraper/``
+(``scraper/vinted.py``, ``scraper/leboncoin.py``) car elles importent Playwright,
+absent de l'image backend. Le port ``SourcingProvider`` (interface ``scrape``) est
+défini dans ``app.adapters.ports`` ; le parsing pur est dans ``app.scraping``.
 
-from typing import Any
-
-from app.adapters.ports import SourcingProvider
-
-
-class ScraperSourcingProvider(SourcingProvider):
-    def fetch_listings(self, **kwargs: Any) -> Any:
-        raise NotImplementedError("jalon 2")
+Ce module ne contient donc plus de stub : il documente seulement où trouver les
+adapters réels, afin d'éviter d'importer Playwright côté backend/tests.
+"""

@@ -50,11 +50,19 @@ class CertProvider(ABC):
 
 
 class SourcingProvider(ABC):
-    """Source d'annonces de sourcing (Vinted, Leboncoin, …)."""
+    """Source d'annonces de sourcing (Vinted, Leboncoin, …).
+
+    Une implémentation par plateforme, derrière une interface commune. Le fetch
+    réel (Playwright) vit dans le conteneur ``scraper/`` ; le parsing est pur. En
+    cas de blocage, lever ``ScraperBlocked`` (l'orchestration applique un backoff).
+    """
+
+    #: identifiant de plateforme ('vinted' | 'leboncoin' | …)
+    platform: str = "unknown"
 
     @abstractmethod
-    def fetch_listings(self, **kwargs: Any) -> Any:
-        """Renvoie une liste d'annonces brutes à évaluer."""
+    def scrape(self, query: str) -> list:
+        """Renvoie une liste de ``RawListing`` pour une requête."""
         raise NotImplementedError
 
 
