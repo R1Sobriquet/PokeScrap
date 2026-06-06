@@ -54,7 +54,8 @@ class Settings(BaseSettings):
     # --- PSA Public API ---
     psa_api_username: str = ""
     psa_api_password: str = ""
-    psa_base_url: str = "https://www.psacard.com/publicapi"
+    psa_api_token: str = ""  # token statique d'API (réel) ; prioritaire si fourni
+    psa_base_url: str = "https://api.psacard.com/publicapi"
 
     @property
     def database_url(self) -> str:
