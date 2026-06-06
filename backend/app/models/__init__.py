@@ -4,6 +4,7 @@ La source de vérité du schéma reste ``db/schema.sql``. On ne mappe ici que le
 tables exploitées par les jalons en cours (le reste viendra au fil des jalons).
 """
 
+from app.models.account_snapshot import AccountSnapshot
 from app.models.alert import Alert
 from app.models.lot import Lot
 from app.models.position import Position
@@ -17,6 +18,7 @@ from app.models.transaction import Transaction
 from app.models.watchlist import Watchlist
 
 __all__ = [
+    "AccountSnapshot",
     "Alert",
     "Lot",
     "Position",
