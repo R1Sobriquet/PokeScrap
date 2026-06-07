@@ -7,6 +7,7 @@ tables exploitées par les jalons en cours (le reste viendra au fil des jalons).
 from app.models.account_snapshot import AccountSnapshot
 from app.models.alert import Alert
 from app.models.grading_opportunity import GradingOpportunity
+from app.models.job_run import JobRun
 from app.models.lot import Lot
 from app.models.lot_item import LotItem
 from app.models.position import Position
@@ -24,6 +25,7 @@ __all__ = [
     "AccountSnapshot",
     "Alert",
     "GradingOpportunity",
+    "JobRun",
     "Lot",
     "LotItem",
     "Position",

@@ -132,6 +132,21 @@ CREATE TABLE tracked_sets (
     UNIQUE KEY uq_tracked_set_slug (set_slug)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------- job_runs (jobs à la demande) -----------
+CREATE TABLE job_runs (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    job_name     VARCHAR(64)  NOT NULL,
+    status       VARCHAR(16)  NOT NULL DEFAULT 'running',
+    started_at   DATETIME     NOT NULL,
+    finished_at  DATETIME     NULL,
+    result_json  JSON         NULL,
+    error_text   TEXT         NULL,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_job_name_status (job_name, status),
+    KEY idx_job_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ----------------------------- 6. sourcing_listings ----------------
 CREATE TABLE sourcing_listings (
     id                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,

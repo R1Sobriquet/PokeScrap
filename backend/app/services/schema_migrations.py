@@ -32,6 +32,23 @@ CREATE TABLE IF NOT EXISTS tracked_sets (
 """
 
 
+_JOB_RUNS_DDL = """
+CREATE TABLE IF NOT EXISTS job_runs (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    job_name     VARCHAR(64)  NOT NULL,
+    status       VARCHAR(16)  NOT NULL DEFAULT 'running',
+    started_at   DATETIME     NOT NULL,
+    finished_at  DATETIME     NULL,
+    result_json  JSON         NULL,
+    error_text   TEXT         NULL,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_job_name_status (job_name, status),
+    KEY idx_job_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+
 def ensure_schema_upgrades(engine: Engine) -> None:
     """Applique les upgrades manquants (MySQL uniquement)."""
     if engine.dialect.name != "mysql":
@@ -39,6 +56,7 @@ def ensure_schema_upgrades(engine: Engine) -> None:
     with engine.begin() as conn:
         db_name = conn.execute(text("SELECT DATABASE()")).scalar()
         conn.execute(text(_TRACKED_SETS_DDL))
+        conn.execute(text(_JOB_RUNS_DDL))
         col = conn.execute(
             text(
                 "SELECT COUNT(*) FROM information_schema.columns "
