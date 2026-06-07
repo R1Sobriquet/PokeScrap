@@ -35,11 +35,38 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 > comparateur de grading pondéré (gated Pro) + authenticité PSA (tous modes).
 >
 > **Jalon 8 — Dashboard React (8 écrans).** Interface de **revue, configuration et
-> override** (l'exécution « chaud » reste sur Discord). Cockpit (KPIs + cascade +
-> palier), Opportunités (+ onglet « Bloquées » avec motifs), Portefeuille (sell
-> engine), Watchlist (éditable + sparkline + signal PE), Lots & Liquidation
-> (intake/segment/promote), Ledger & Fiscalité (+ export CSV), Grading (grisé hors
-> Pro), Réglages (édition typée + disjoncteurs + bascule Free→Pro atomique).
+> override** (l'exécution « chaud » reste sur Discord).
+>
+> **Jalon 9 — Durcissement & mise en production.** Sauvegardes chiffrées + offsite
+> + **test de restauration**, observabilité (`/status` + **dead-man's switch** +
+> logs JSON avec **redaction des secrets**), rétention (purge sourcing + élagage
+> price_snapshots 1/jour/tier), validation **Free→Pro** scriptée, compose durci
+> (localhost, `restart: unless-stopped`, healthchecks), et **runbooks** de go-live.
+
+## Jalon 9 — production
+
+- **Sauvegardes** (`scripts/backup.sh` / `restore.sh` / `restore_test.sh`) :
+  `mysqldump` → gzip → **chiffrement age/gpg** → local + offsite, rétention,
+  **test de restauration mensuel** (base jetable, contrôle d'intégrité). Voir
+  [`docs/runbook_backup_restore.md`](docs/runbook_backup_restore.md).
+- **Observabilité** : `GET /status` (fraîcheur jobs/backup, blocages, alertes),
+  **dead-man's switch** (`tech_error` si un job critique est silencieux >
+  `job_heartbeat_max_age_min`), **logs JSON** avec redaction des secrets.
+- **Rétention** : purge `sourcing_listings` (J6) + élagage optionnel des
+  `price_snapshots` intraday (≥ 1/jour/tier préservé pour l'anti-pump).
+- **Sécurité** : tout sur `127.0.0.1` / réseau Docker interne (accès distant
+  **Tailscale**, jamais de port-forward) ; `.env` en `chmod 600`, jamais commité ;
+  healthchecks par service ; mutations sensibles (achat/vente/30-70) en
+  transactions atomiques.
+- **Go-live** : [`docs/runbook_deploy.md`](docs/runbook_deploy.md),
+  [`docs/runbook_go_live.md`](docs/runbook_go_live.md) ;
+  `python scripts/check_pro_readiness.py` avant la bascule payante.
+
+```bash
+docker compose exec backend python -m app.cli status            # observabilité
+scripts/backup.sh && scripts/restore_test.sh                    # sauvegarde + test
+python scripts/check_pro_readiness.py                           # avant Free→Pro
+```
 
 ## Jalon 8 — dashboard
 

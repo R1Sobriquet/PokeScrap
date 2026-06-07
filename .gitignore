@@ -31,3 +31,6 @@ db_data/
 .idea/
 .vscode/
 .DS_Store
+
+# --- Sauvegardes locales (J9) ---
+backups/
