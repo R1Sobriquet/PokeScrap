@@ -1,0 +1,151 @@
+"""Endpoints d'action & réglages du dashboard (protégés JWT).
+
+Réutilisent **les mêmes services** que le CLI et les interactions Discord — une
+seule source de vérité pour les mutations. Aucune logique métier ici.
+"""
+
+from __future__ import annotations
+
+from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
+from sqlalchemy import select
+from sqlalchemy.orm import Session
+
+from app.auth.security import get_current_user
+from app.config import invalidate_setting
+from app.db import get_db
+from app.models import Setting, Watchlist
+from app.services.interactions import handle_palier_confirm
+from app.services.liquidation_service import intake_lot, promote_to_position, segment_lot
+from app.services.portfolio import record_deposit
+
+router = APIRouter(tags=["admin"], dependencies=[Depends(get_current_user)])
+
+# Bascule Free → Pro (atomique). Effet au prochain run de job.
+_PRO_VALUES = {
+    "poketrace_plan": "pro",
+    "valuation_market": "EU",
+    "valuation_marketplace": "cardmarket",
+    "feature_grading_enabled": "true",
+    "feature_history_full": "true",
+    "poketrace_daily_limit": "10000",
+    "poketrace_min_interval_ms": "333",
+}
+_FREE_VALUES = {
+    "poketrace_plan": "free",
+    "valuation_market": "US",
+    "valuation_marketplace": "tcgplayer",
+    "feature_grading_enabled": "false",
+    "feature_history_full": "false",
+    "poketrace_daily_limit": "250",
+    "poketrace_min_interval_ms": "2000",
+}
+
+
+@router.get("/settings")
+def list_settings(db: Session = Depends(get_db)) -> list[dict]:
+    return [
+        {
+            "key": s.setting_key, "value": s.setting_value,
+            "value_type": s.value_type, "description": s.description,
+        }
+        for s in db.scalars(select(Setting).order_by(Setting.setting_key)).all()
+    ]
+
+
+class SettingUpdate(BaseModel):
+    value: str
+
+
+@router.put("/settings/{key}")
+def update_setting(key: str, payload: SettingUpdate, db: Session = Depends(get_db)) -> dict:
+    setting = db.scalar(select(Setting).where(Setting.setting_key == key))
+    if setting is None:
+        raise HTTPException(status_code=404, detail="Réglage inconnu")
+    setting.setting_value = str(payload.value)
+    db.commit()
+    invalidate_setting(key)  # le cache get_setting est recalculé à la prochaine lecture
+    return {"key": key, "value": setting.setting_value, "value_type": setting.value_type}
+
+
+class SwitchPro(BaseModel):
+    to_pro: bool = True
+
+
+@router.post("/settings/switch-pro")
+def switch_pro(payload: SwitchPro, db: Session = Depends(get_db)) -> dict:
+    values = _PRO_VALUES if payload.to_pro else _FREE_VALUES
+    updated = {}
+    for key, value in values.items():  # transaction unique
+        setting = db.scalar(select(Setting).where(Setting.setting_key == key))
+        if setting is None:
+            db.add(Setting(setting_key=key, setting_value=value, value_type="string"))
+        else:
+            setting.setting_value = value
+        updated[key] = value
+    db.commit()
+    invalidate_setting()  # invalide tout le cache
+    return {"mode": "pro" if payload.to_pro else "free", "updated": updated,
+            "note": "Prend effet au prochain run de job."}
+
+
+class DepositIn(BaseModel):
+    amount: float
+
+
+@router.post("/deposit")
+def deposit(payload: DepositIn, db: Session = Depends(get_db)) -> dict:
+    tx = record_deposit(db, payload.amount)
+    return {"transaction_id": tx.id, "amount": payload.amount}
+
+
+class IntakeIn(BaseModel):
+    lot_id: int
+
+
+@router.post("/intake")
+def intake(payload: IntakeIn, db: Session = Depends(get_db)) -> dict:
+    return intake_lot(db, payload.lot_id)
+
+
+@router.post("/lots/{lot_id}/segment")
+def segment(lot_id: int, db: Session = Depends(get_db)) -> dict:
+    return segment_lot(db, lot_id)
+
+
+@router.post("/lot-items/{item_id}/promote")
+def promote(item_id: int, db: Session = Depends(get_db)) -> dict:
+    return promote_to_position(db, item_id)
+
+
+@router.post("/alerts/{alert_id}/confirm")
+def confirm_alert(alert_id: int, db: Session = Depends(get_db)) -> dict:
+    return handle_palier_confirm(db, alert_id)
+
+
+class WatchlistUpdate(BaseModel):
+    tier: str | None = None
+    keywords: str | None = None
+    is_trinity: bool | None = None
+    is_illustration_rare: bool | None = None
+    is_active: bool | None = None
+
+
+@router.put("/watchlist/{product_id}")
+def update_watchlist(product_id: int, payload: WatchlistUpdate, db: Session = Depends(get_db)) -> dict:
+    """Édition de la watchlist (donnée de config, pas de décision métier)."""
+    watch = db.scalar(select(Watchlist).where(Watchlist.product_id == product_id))
+    if watch is None:
+        raise HTTPException(status_code=404, detail="Produit hors watchlist")
+    if payload.tier is not None:
+        watch.tier = payload.tier
+    if payload.keywords is not None:
+        watch.keywords = payload.keywords
+    if payload.is_trinity is not None:
+        watch.is_trinity = 1 if payload.is_trinity else 0
+    if payload.is_illustration_rare is not None:
+        watch.is_illustration_rare = 1 if payload.is_illustration_rare else 0
+    if payload.is_active is not None:
+        watch.is_active = 1 if payload.is_active else 0
+    db.commit()
+    return {"product_id": product_id, "status": "ok"}

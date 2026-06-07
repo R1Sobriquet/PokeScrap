@@ -78,8 +78,19 @@ def list_watchlist(
         stmt = stmt.where(Watchlist.is_active == 1)
     stmt = stmt.order_by(Watchlist.tier, Product.name)
     rows = db.execute(stmt).all()
-    return [
-        {
+    out = []
+    for w, p in rows:
+        snap = get_latest_price(db, w.product_id)
+        latest = None
+        if snap is not None:
+            latest = {
+                "price_avg": float(snap.price_avg) if snap.price_avg is not None else None,
+                "avg_1d": float(snap.avg_1d) if snap.avg_1d is not None else None,
+                "avg_7d": float(snap.avg_7d) if snap.avg_7d is not None else None,
+                "avg_30d": float(snap.avg_30d) if snap.avg_30d is not None else None,
+                "sale_count": snap.sale_count,
+            }
+        out.append({
             "product_id": w.product_id,
             "tier": w.tier,
             "is_trinity": bool(w.is_trinity),
@@ -88,9 +99,9 @@ def list_watchlist(
             "keywords": w.keywords,
             "is_active": bool(w.is_active),
             "product": _product_dict(p),
-        }
-        for w, p in rows
-    ]
+            "latest": latest,
+        })
+    return out
 
 
 @router.get("/products/{product_id}/prices/latest")
