@@ -54,12 +54,12 @@ def build_providers(selectors: dict, break_threshold: float) -> list:
     providers = []
     if _enabled("SCRAPE_VINTED_ENABLED"):
         providers.append(VintedScraper(
-            PlaywrightFetcher(user_agent=ua, cookies=_cookies("VINTED")),
+            PlaywrightFetcher(user_agent=ua, cookies=_cookies("VINTED"), platform="vinted"),
             selectors, break_threshold=break_threshold,
         ))
     if _enabled("SCRAPE_LBC_ENABLED"):
         providers.append(LeboncoinScraper(
-            PlaywrightFetcher(user_agent=ua, cookies=_cookies("LBC")),
+            PlaywrightFetcher(user_agent=ua, cookies=_cookies("LBC"), platform="leboncoin"),
             selectors, break_threshold=break_threshold,
         ))
     return providers

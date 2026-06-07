@@ -10,8 +10,18 @@ class ScraperBlocked(RuntimeError):
     """Levée quand une plateforme bloque (CAPTCHA / 403 / mur anti-bot).
 
     On ne lutte pas : l'orchestration capte cette exception, émet une alerte
-    ``tech_error`` et applique un backoff sur la plateforme.
+    ``tech_error`` (avec le diagnostic) et applique un backoff sur la plateforme.
+    Porte des détails structurés pour le diagnostic (cause, code HTTP, URL, titre).
     """
+
+    def __init__(self, message: str, *, reason: str | None = None,
+                 status: int | None = None, url: str | None = None,
+                 title: str | None = None):
+        super().__init__(message)
+        self.reason = reason
+        self.status = status
+        self.url = url
+        self.title = title
 
 
 class SelectorsBroken(RuntimeError):
