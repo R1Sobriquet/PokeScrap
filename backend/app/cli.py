@@ -175,6 +175,37 @@ def cmd_verify_cert(args: argparse.Namespace) -> None:
         logger.info("verify-cert %s: %s", args.cert_number, verify_slab(db, args.cert_number))
 
 
+def cmd_status(args: argparse.Namespace) -> None:
+    from app.services.health_status import get_status
+
+    with SessionLocal() as db:
+        logger.info("status: %s", get_status(db))
+
+
+def cmd_dead_mans_switch(args: argparse.Namespace) -> None:
+    from app.services.health_status import run_dead_mans_switch
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("dead-mans-switch: %s", run_dead_mans_switch(db))
+
+
+def cmd_prune_snapshots(args: argparse.Namespace) -> None:
+    from app.services.retention import prune_price_snapshots
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        logger.info("prune-snapshots: %s", prune_price_snapshots(db))
+
+
+def cmd_record_backup(args: argparse.Namespace) -> None:
+    from app.services.health_status import record_backup
+
+    with SessionLocal() as db:
+        record_backup(db)
+    logger.info("record-backup: horodatage de sauvegarde enregistré")
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -231,6 +262,11 @@ def build_parser() -> argparse.ArgumentParser:
     p_cert = sub.add_parser("verify-cert", help="Vérifie l'authenticité d'un cert PSA")
     p_cert.add_argument("cert_number")
     p_cert.set_defaults(func=cmd_verify_cert)
+
+    sub.add_parser("status", help="Agrégat d'observabilité (fraîcheur jobs/backup)").set_defaults(func=cmd_status)
+    sub.add_parser("dead-mans-switch", help="Vérifie les jobs silencieux → tech_error").set_defaults(func=cmd_dead_mans_switch)
+    sub.add_parser("prune-snapshots", help="Élague les price_snapshots intraday (si activé)").set_defaults(func=cmd_prune_snapshots)
+    sub.add_parser("record-backup", help="Enregistre l'horodatage de la dernière sauvegarde").set_defaults(func=cmd_record_backup)
 
     return parser
 

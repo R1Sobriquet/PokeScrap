@@ -31,6 +31,7 @@ from app.models import (
     TierConfig,
     Transaction,
 )
+from app.services.health_status import get_status
 from app.services.ledger import compute_kpis
 from app.services.prices import get_latest_price
 from app.services.tier_state import get_current_tier_number
@@ -313,6 +314,12 @@ def alerts(
         }
         for a in db.scalars(stmt).all()
     ]
+
+
+@router.get("/status")
+def status(db: Session = Depends(get_db)) -> dict:
+    """Agrégat d'observabilité : fraîcheur des jobs, sauvegarde, blocages, alertes."""
+    return get_status(db)
 
 
 @router.get("/tiers")

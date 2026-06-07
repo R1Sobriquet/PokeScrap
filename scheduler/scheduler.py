@@ -21,16 +21,17 @@ from apscheduler.triggers.cron import CronTrigger
 from app.adapters.poketrace import PokeTracePriceProvider
 from app.config import get_setting
 from app.db import SessionLocal
+from app.logging_config import setup_logging
 from app.services.grading_service import run_grading_scan
+from app.services.health_status import record_heartbeat, run_dead_mans_switch, touch_heartbeat_file
 from app.services.ingestion import ingest_watchlist_prices
 from app.services.kpi_snapshot import run_kpi_snapshot
 from app.services.pe_signal_service import run_pe_accumulation_scan
+from app.services.retention import prune_price_snapshots
 from app.services.runtime_settings import ensure_runtime_settings
 from app.services.selling_service import evaluate_position_sales
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] scheduler: %(message)s"
-)
+setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("scheduler")
 
 TIMEZONE = os.getenv("APP_TIMEZONE", "Europe/Paris")
@@ -51,7 +52,24 @@ def _get_provider() -> PokeTracePriceProvider:
 
 
 def heartbeat() -> None:
+    touch_heartbeat_file()  # liveness fichier (healthcheck Docker)
+    with SessionLocal() as db:
+        record_heartbeat(db, "scheduler")
     logger.info("heartbeat")
+
+
+def dead_mans_switch() -> None:
+    with SessionLocal() as db:
+        result = run_dead_mans_switch(db)
+    if result["stale"]:
+        logger.warning("dead_mans_switch: jobs silencieux %s", result["stale"])
+
+
+def prune_snapshots() -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = prune_price_snapshots(db)
+    logger.info("prune_snapshots: %s", result)
 
 
 def refresh_prices() -> None:
@@ -112,8 +130,13 @@ def main() -> None:
         CronTrigger(day_of_week="mon", hour=3, minute=0, timezone=TIMEZONE),
         id="grading_scan",
     )
+    # Dead-man's switch : toutes les 30 min. Pruning rétention : quotidien 04:15.
+    scheduler.add_job(dead_mans_switch, "interval", minutes=30, id="dead_mans_switch")
+    scheduler.add_job(
+        prune_snapshots, CronTrigger(hour=4, minute=15, timezone=TIMEZONE), id="prune_snapshots"
+    )
     logger.info(
-        "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly).",
+        "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly, deadman=30m).",
         TIMEZONE,
         JOB_REFRESH_PRICES,
         JOB_REFRESH_HISTORY,

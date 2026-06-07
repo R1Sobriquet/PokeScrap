@@ -16,13 +16,13 @@ from apscheduler.schedulers.blocking import BlockingScheduler
 
 from app.config import get_setting
 from app.db import SessionLocal
+from app.logging_config import setup_logging
 from app.scraping.selectors import get_selectors
+from app.services.health_status import record_heartbeat, touch_heartbeat_file
 from app.services.runtime_settings import ensure_runtime_settings
 from app.services.sourcing import purge_old_sourcing, scrape_sourcing
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] scraper: %(message)s"
-)
+setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("scraper")
 
 TIMEZONE = os.getenv("APP_TIMEZONE", "Europe/Paris")
@@ -65,10 +65,21 @@ def build_providers(selectors: dict, break_threshold: float) -> list:
     return providers
 
 
+def alive() -> None:
+    """Liveness fichier + heartbeat DB (le scrape réel est espacé)."""
+    touch_heartbeat_file()
+    try:
+        with SessionLocal() as db:
+            record_heartbeat(db, "scraper")
+    except Exception:  # pragma: no cover - robustesse
+        logger.exception("heartbeat scraper en échec (isolé).")
+
+
 def run_scrape() -> None:
     try:
         with SessionLocal() as db:
             ensure_runtime_settings(db)
+            record_heartbeat(db, "scraper")
             break_threshold = float(get_setting("selector_break_threshold", default=30))
             providers = build_providers(get_selectors(), break_threshold)
             if not providers:
@@ -89,7 +100,9 @@ def run_purge() -> None:
 
 def main() -> None:
     logger.info("scraper prêt (Playwright) — interval=%smin", INTERVAL_MIN)
+    alive()  # heartbeat initial
     scheduler = BlockingScheduler(timezone=TIMEZONE)
+    scheduler.add_job(alive, "interval", minutes=1, id="alive")
     scheduler.add_job(run_scrape, "interval", minutes=INTERVAL_MIN, id="scrape_sourcing")
     scheduler.add_job(run_purge, "cron", hour=4, minute=30, id="purge_sourcing")
     try:

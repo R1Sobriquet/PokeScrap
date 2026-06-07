@@ -20,7 +20,9 @@ from app.adapters.discord_notifier import DiscordNotifier
 from app.config import get_setting
 from app.db import SessionLocal
 from app.models import Alert, SourcingListing
+from app.logging_config import setup_logging
 from app.services.alert_dispatcher import dispatch_pending, flush_digest, is_digest_time
+from app.services.health_status import record_heartbeat, touch_heartbeat_file
 from app.services.interactions import (
     handle_buy_purchased,
     handle_ignore,
@@ -30,9 +32,7 @@ from app.services.interactions import (
 )
 from app.services.runtime_settings import ensure_runtime_settings
 
-logging.basicConfig(
-    level=logging.INFO, format="%(asctime)s [%(levelname)s] bot: %(message)s"
-)
+setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("bot")
 
 TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
@@ -55,8 +55,10 @@ def _utcnow() -> dt.datetime:
 
 # ----------------------------------------------------- bridges DB (en thread)
 def _dispatch_once() -> None:
+    touch_heartbeat_file()  # liveness fichier (healthcheck Docker)
     with SessionLocal() as db:
         now = _utcnow()
+        record_heartbeat(db, "bot")
         dispatch_pending(db, notifier, now=now)
         poll = int(get_setting("dispatcher_poll_sec", default=20))
         if is_digest_time(now, str(get_setting("digest_time", default="09:00")), poll):
