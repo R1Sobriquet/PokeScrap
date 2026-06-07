@@ -34,6 +34,16 @@ from app.services.prices import get_latest_price
 
 logger = logging.getLogger("services.buy_evaluation")
 
+# Valeur sentinelle pour ``sourcing_listings.ratio_pct`` (DECIMAL(6,2), max 9999.99).
+# Un ratio au-delà signifie « bien trop cher, bloqué » : la valeur exacte n'a aucune
+# importance pour la décision (la règle des 50 % a déjà tranché), seul le stockage
+# doit rester dans les bornes de la colonne.
+RATIO_PCT_MAX = 9999.99
+
+
+def _cap_ratio(ratio: float | None) -> float | None:
+    return None if ratio is None else min(ratio, RATIO_PCT_MAX)
+
 
 def _utcnow() -> dt.datetime:
     return dt.datetime.now(dt.timezone.utc).replace(tzinfo=None)
@@ -246,7 +256,8 @@ def evaluate_listing(db: Session, listing_id: int, *, cert_provider=None) -> dic
     now = _utcnow()
     listing.evaluated_at = now
     listing.estimated_resale_value = buy.resale_value
-    listing.ratio_pct = buy.ratio_pct
+    # Plafonné aux bornes de la colonne (revente très faible → ratio énorme).
+    listing.ratio_pct = _cap_ratio(buy.ratio_pct)
     listing.passes_50_rule = 1 if buy.passes else 0
 
     passes_all = buy.passes and filt.passes and cash.allowed

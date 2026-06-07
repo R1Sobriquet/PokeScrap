@@ -198,3 +198,45 @@ def test_blocked_by_cash_floor_no_alert(db_session):
     assert result["status"] == "blocked"
     assert result["filter_flags"]["cash_block"] is True
     assert _alert_count(db) == 0
+
+
+def test_listing_with_unpriced_products_no_crash(engine_ready):
+    # Régression : produits détectés SANS price_snapshot → revente ~ vrac plancher
+    # → ratio énorme. Doit être plafonné (pas de DataError) et le statut cohérent.
+    db = engine_ready
+    p = Product(product_type="single", name="NoPrice", language="EN",
+                set_name="X", poketrace_id="pt-noprice")
+    db.add(p)
+    db.commit()
+    db.add(Watchlist(product_id=p.id, tier="B", priority_coef=1))
+    db.commit()
+
+    lid = _listing(db, asking=44, ship=0, prot=0, total_cards=1,
+                   detected=[{"product_id": p.id, "qty": 1, "confidence": 0.95}])
+
+    result = evaluate_listing(db, lid)  # ne doit pas lever
+
+    listing = db.get(SourcingListing, lid)
+    assert result["status"] == "blocked"
+    assert listing.ratio_pct is not None
+    assert float(listing.ratio_pct) <= 9999.99  # plafonné aux bornes DECIMAL(6,2)
+    assert _alert_count(db) == 0  # bloqué → aucune alerte d'achat
+
+
+def test_listing_all_unpriced_zero_cards_no_resale(engine_ready):
+    # Aucun prix et estimated_total_cards = 0 → revente nulle → blocked, ratio None.
+    db = engine_ready
+    p = Product(product_type="single", name="NoPrice2", language="EN",
+                set_name="X", poketrace_id="pt-noprice2")
+    db.add(p)
+    db.commit()
+    db.add(Watchlist(product_id=p.id, tier="B", priority_coef=1))
+    db.commit()
+
+    lid = _listing(db, asking=10, ship=0, prot=0, total_cards=0,
+                   detected=[{"product_id": p.id, "qty": 1, "confidence": 0.95}])
+
+    result = evaluate_listing(db, lid)
+    assert result["status"] == "blocked"
+    assert db.get(SourcingListing, lid).ratio_pct is None  # pas de revente → ratio non calculé
+    assert _alert_count(db) == 0

@@ -39,15 +39,24 @@ def estimate_lot_resale_net(
 
     Net de frais, vrac valorisé au tarif plancher (net de Vinted), le tout
     minoré par le haircut prudentiel.
+
+    **Produits sans prix** : un produit détecté qui n'a aucun ``price_snapshot``
+    n'a pas de valeur fiable → on ne le compte **pas** comme identifié (sinon il
+    vaudrait 0 € tout en retirant sa quantité du vrac, ce qui effondrerait la
+    revente et produirait des ratios absurdes). Ses exemplaires retombent dans le
+    pool vrac (valorisés au tarif plancher). Seule la quantité **valorisée** est
+    déduite de ``estimated_total_cards``.
     """
     value = 0.0
+    priced_qty = 0
     for p in _identified(listing, params.min_match_confidence):
         unit = _net_unit_eur(prices.get(p.product_id), params)
-        if unit is not None:
-            value += unit * p.qty
+        if unit is None:
+            continue  # pas de prix → traité en vrac, pas en identifié à 0 €
+        value += unit * p.qty
+        priced_qty += p.qty
 
-    identified_qty = sum(p.qty for p in _identified(listing, params.min_match_confidence))
-    bulk = max(0, listing.estimated_total_cards - identified_qty)
+    bulk = max(0, listing.estimated_total_cards - priced_qty)
     value += bulk * params.bulk_value_per_card * (1 - params.vinted_fee_rate / 100.0)
 
     return value * params.lot_confidence_haircut
