@@ -1,3 +1,4 @@
-# Playwright (paquet + navigateurs) est fourni par l'image de base.
-# Le code partagé du backend est installé via backend/requirements.txt (Dockerfile).
+# Playwright (paquet Python) est épinglé ci-dessous ; les navigateurs + deps système
+# sont installés dans scraper/Dockerfile via `playwright install --with-deps chromium`.
 APScheduler==3.11.0
+playwright==1.49.0
