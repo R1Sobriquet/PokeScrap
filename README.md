@@ -30,11 +30,36 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 > Vinted/LeBoncoin (conteneur Playwright **isolé, sortant, best-effort**) →
 > `sourcing_listings` (dédup) → matching mots-clés → `evaluate_listing` (J3).
 >
-> **Jalon 7 — Liquidation (Module B) & Grading (Module A).** Intake d'un lot
-> acheté → segmentation (individuelles routées + **lots vrac sans doublon**) →
-> prix suggérés ; `promote_to_position` (pont vers le moteur de vente J5).
-> Comparateur de grading **pondéré** (gated Pro) + **authenticité PSA** (gratuite,
-> tous modes). **Pas encore de dashboard / durcissement** (J8/J9).
+> **Jalon 7 — Liquidation (Module B) & Grading (Module A).** Intake → segmentation
+> (individuelles routées + lots vrac sans doublon) → `promote_to_position` ;
+> comparateur de grading pondéré (gated Pro) + authenticité PSA (tous modes).
+>
+> **Jalon 8 — Dashboard React (8 écrans).** Interface de **revue, configuration et
+> override** (l'exécution « chaud » reste sur Discord). Cockpit (KPIs + cascade +
+> palier), Opportunités (+ onglet « Bloquées » avec motifs), Portefeuille (sell
+> engine), Watchlist (éditable + sparkline + signal PE), Lots & Liquidation
+> (intake/segment/promote), Ledger & Fiscalité (+ export CSV), Grading (grisé hors
+> Pro), Réglages (édition typée + disjoncteurs + bascule Free→Pro atomique).
+
+## Jalon 8 — dashboard
+
+- **Architecture** : zéro logique métier au frontend — React lit l'API et appelle
+  des **endpoints d'action qui réutilisent les mêmes services** que le CLI et les
+  interactions Discord (une seule source de vérité). JWT en mémoire (jamais en
+  localStorage) ; aucune clé externe côté front.
+- **Stack** : Vite + React + Tailwind + recharts, wrapper fetch authentifié, hook
+  de polling (`dashboard_poll_interval_sec`).
+- **API ajoutée** (toutes JWT) : lecture `/cockpit`, `/snapshots[/latest]`,
+  `/positions`, `/lots[/{id}/items]`, `/opportunities`, `/transactions`,
+  `/grading-opportunities`, `/alerts`, `/tiers`, `/settings`,
+  `/ledger/export.csv` ; actions `PUT /settings/{key}` (invalide le cache),
+  `POST /deposit|/intake|/lots/{id}/segment|/lot-items/{id}/promote|/alerts/{id}/confirm`,
+  `PUT /watchlist/{id}`, `POST /settings/switch-pro` (atomique, confirmé).
+
+```bash
+docker compose up -d --build       # dashboard sur http://127.0.0.1:5173
+cd frontend && npm install && npm test   # tests Vitest
+```
 
 ## Jalon 7 — liquidation & grading
 
