@@ -105,6 +105,7 @@ CREATE TABLE watchlist (
     priority_coef        DECIMAL(5,2) NOT NULL DEFAULT 1.00,
     keywords             VARCHAR(512) NULL,
     notes                TEXT         NULL,
+    source               VARCHAR(16)  NOT NULL DEFAULT 'manual',
     is_active            TINYINT(1)   NOT NULL DEFAULT 1,
     created_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
@@ -113,6 +114,22 @@ CREATE TABLE watchlist (
     KEY idx_tier (tier),
     KEY idx_trinity (is_trinity),
     CONSTRAINT fk_watch_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------- tracked_sets (auto-watchlist) ----------
+CREATE TABLE tracked_sets (
+    id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    set_slug        VARCHAR(128) NOT NULL,
+    name            VARCHAR(255) NOT NULL,
+    is_active       TINYINT(1)   NOT NULL DEFAULT 1,
+    min_value_eur   DECIMAL(12,2) NOT NULL DEFAULT 0,
+    include_single  TINYINT(1)   NOT NULL DEFAULT 1,
+    include_sealed  TINYINT(1)   NOT NULL DEFAULT 1,
+    included_families JSON       NULL,
+    created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_tracked_set_slug (set_slug)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- ----------------------------- 6. sourcing_listings ----------------
@@ -455,6 +472,11 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 ('scrape_vinted_enabled','true','bool','Active le scraping Vinted (toggle par source)'),
 ('scrape_leboncoin_enabled','true','bool','Active le scraping LeBoncoin (couper si DataDome infranchissable)'),
 ('scrape_max_queries_per_run','1','int','Nb de recherches par source par run (rythme lent)'),
+('sourcing_scraping_enabled','false','bool','Active le scraping AUTO (off : DataDome infranchissable ; sourcing manuel OK)'),
+('tracked_sets_max_pages','5','int','Pages max paginées par set/sync (quota PokeTrace 250/j)'),
+('tracked_sets_page_size','50','int','Taille de page pour le sync des sets'),
+('movers_min_volume','5','int','Volume minimal de ventes pour qu''un mover compte (anti-bruit)'),
+('movers_top_n','10','int','Nombre de top movers exposés par set'),
 -- J9 — Durcissement / observabilité / rétention
 ('job_heartbeat_max_age_min','720','int','Âge max (min) d''un job critique avant dead-man''s switch'),
 ('price_snapshot_detail_days','60','int','Fenêtre détaillée des price_snapshots (au-delà : 1/jour/tier)'),

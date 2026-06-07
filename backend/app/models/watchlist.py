@@ -26,6 +26,8 @@ class Watchlist(Base):
     priority_coef: Mapped[Decimal] = mapped_column(Numeric(5, 2), nullable=False, default=1)
     keywords: Mapped[str | None] = mapped_column(String(512), nullable=True)
     notes: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # 'manual' (ajout utilisateur, jamais écrasé par le sync) | 'auto' (peuplé par set).
+    source: Mapped[str] = mapped_column(String(16), nullable=False, default="manual")
     is_active: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime, server_default=func.current_timestamp()

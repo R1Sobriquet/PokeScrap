@@ -16,6 +16,7 @@ from app.models.psa_cert import PsaCert
 from app.models.setting import Setting
 from app.models.sourcing_listing import SourcingListing
 from app.models.tier import TierConfig
+from app.models.tracked_set import TrackedSet
 from app.models.transaction import Transaction
 from app.models.watchlist import Watchlist
 
@@ -32,6 +33,7 @@ __all__ = [
     "Setting",
     "SourcingListing",
     "TierConfig",
+    "TrackedSet",
     "Transaction",
     "Watchlist",
 ]
