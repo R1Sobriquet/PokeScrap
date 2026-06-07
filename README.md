@@ -43,6 +43,27 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 > price_snapshots 1/jour/tier), validation **Free→Pro** scriptée, compose durci
 > (localhost, `restart: unless-stopped`, healthchecks), et **runbooks** de go-live.
 
+## Sourcing & auto-watchlist
+
+- **Scraping auto désactivé par défaut** (`sourcing_scraping_enabled=false`) :
+  Vinted (DataDome) et LeBoncoin (403) sont infranchissables sans course à
+  l'armement (refusée). Le code reste en place pour réactivation. Le **sourcing
+  manuel** (`POST /listings` / `evaluate_listing`) reste pleinement fonctionnel.
+- **Auto-watchlist par set** (`tracked_sets`) : on déclare des sets cibles ; le job
+  `sync-tracked-sets` (1×/jour, quota-aware) peuple la watchlist en **filtrant
+  côté code** par `productType`/`productFamily` + valeur min (l'API ignore
+  `?productType=sealed`). Le scellé est géré (`prices.tcgplayer.UNOPENED`). Les
+  entrées `source='auto'` n'écrasent jamais les ajouts `source='manual'`.
+- **Top movers** (`scan-movers`, écran « Sets & Movers ») : hausse `avg_7d/avg_30d`
+  **confirmée par le volume** (anti-bruit). Le radar **signale**, il n'achète pas —
+  les garde-fous (50 %, anti-pump, anti-FOMO, cash) restent souverains.
+
+```bash
+docker compose exec backend python -m app.cli sync-tracked-sets   # peuple la watchlist
+docker compose exec backend python -m app.cli scan-movers         # top movers
+python scripts/preflight_tracked_sets.py "prismatic evolutions"   # vérifie la forme API (clé requise)
+```
+
 ## Jalon 9 — production
 
 - **Sauvegardes** (`scripts/backup.sh` / `restore.sh` / `restore_test.sh`) :

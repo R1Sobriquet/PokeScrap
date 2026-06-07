@@ -39,6 +39,8 @@ SETTINGS = {
     "scrape_max_listings_per_run": ("40", "int"), "scrape_blocked_cooldown_min": ("120", "int"),
     "bulk_lot_target_size": ("30", "int"), "sourcing_retention_days": ("90", "int"),
     "saved_queries": ('["lot pokemon"]', "json"),
+    "sourcing_scraping_enabled": ("true", "bool"),  # tests pipeline : on active explicitement
+    "scrape_max_queries_per_run": ("5", "int"),
 }
 
 TIERS = [(1, "T1", 150, 300, 10), (2, "T2", 300, 1000, 10),
@@ -160,3 +162,14 @@ def test_build_queries_from_saved_and_watchlist(db_session):
     queries = build_queries(db)
     assert "lot pokemon" in queries
     assert any("Charizard ex" in q for q in queries)
+
+
+def test_scraping_disabled_by_default(db_session):
+    # Sans sourcing_scraping_enabled (défaut false) : le run est ignoré proprement,
+    # le provider n'est jamais appelé. Le sourcing manuel reste géré ailleurs.
+    db = db_session
+    provider = FakeScraper([_listing()])
+    stats = scrape_sourcing(db, [provider], now=NOW)
+    assert stats["status"] == "disabled"
+    assert provider.calls == 0
+    assert db.scalar(select(func.count()).select_from(SourcingListing)) == 0
