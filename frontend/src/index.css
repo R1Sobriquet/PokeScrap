@@ -1,0 +1,8 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* Outil interne : dense et fonctionnel, clarté avant flash. */
+body {
+  @apply bg-slate-950 text-slate-100 antialiased;
+}
