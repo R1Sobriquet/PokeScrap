@@ -452,6 +452,9 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 ('scrape_blocked_cooldown_min','120','int','Cooldown max (min) après blocage plateforme (backoff)'),
 ('selector_break_threshold','30','int','% de cartes sans champ obligatoire = structure cassée'),
 ('saved_queries','["lot cartes pokemon","display prismatic evolutions"]','json','Requêtes de sourcing sauvegardées'),
+('scrape_vinted_enabled','true','bool','Active le scraping Vinted (toggle par source)'),
+('scrape_leboncoin_enabled','true','bool','Active le scraping LeBoncoin (couper si DataDome infranchissable)'),
+('scrape_max_queries_per_run','1','int','Nb de recherches par source par run (rythme lent)'),
 -- J9 — Durcissement / observabilité / rétention
 ('job_heartbeat_max_age_min','720','int','Âge max (min) d''un job critique avant dead-man''s switch'),
 ('price_snapshot_detail_days','60','int','Fenêtre détaillée des price_snapshots (au-delà : 1/jour/tier)'),

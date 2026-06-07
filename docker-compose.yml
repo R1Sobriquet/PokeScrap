@@ -106,6 +106,10 @@ services:
       timeout: 5s
       retries: 3
       start_period: 60s
+    volumes:
+      # Persistance du contexte (cookies/storage_state) entre runs + screenshots debug.
+      - ./scraper-state:/app/state
+      - ./scraper-debug:/tmp/scraper-debug
     networks:
       - appnet
     # No ports — outbound only.

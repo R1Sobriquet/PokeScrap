@@ -111,18 +111,29 @@ def _upsert_and_evaluate(
     return "evaluated"
 
 
+def _platform_enabled(platform: str) -> bool:
+    """Toggle par source via settings (live, éditable au dashboard)."""
+    return bool(get_setting(f"scrape_{platform}_enabled", default=True))
+
+
 def scrape_sourcing(db: Session, providers: list, *, now: dt.datetime | None = None) -> dict:
     """Boucle de sourcing best-effort. Ne lève jamais."""
     now = now or _utcnow()
     max_listings = int(float(get_setting("scrape_max_listings_per_run", default=40)))
     cooldown_cap = int(float(get_setting("scrape_blocked_cooldown_min", default=120)))
-    queries = build_queries(db)
+    # Rythme lent : une (ou peu de) recherche par source par run pour commencer.
+    max_queries = int(float(get_setting("scrape_max_queries_per_run", default=1)))
+    queries = build_queries(db)[: max(max_queries, 0)]
     products = _match_products(db)
 
-    stats = {"scraped": 0, "new": 0, "duplicates": 0, "blocked": [], "errors": 0}
+    stats = {"scraped": 0, "new": 0, "duplicates": 0, "blocked": [], "errors": 0, "disabled": []}
 
     for provider in providers:
         platform = getattr(provider, "platform", provider.__class__.__name__)
+        if not _platform_enabled(platform):
+            logger.info("Plateforme %s désactivée (settings) — on saute.", platform)
+            stats["disabled"].append(platform)
+            continue
         if scrape_state.is_blocked(db, platform, now):
             logger.info("Plateforme %s en backoff — on saute ce run.", platform)
             continue
@@ -134,8 +145,15 @@ def scrape_sourcing(db: Session, providers: list, *, now: dt.datetime | None = N
                 listings = provider.scrape(query)
             except ScraperBlocked as exc:
                 minutes = scrape_state.record_block(db, platform, now, cooldown_cap_min=cooldown_cap)
-                _tech_error(db, f"Scraping bloqué — {platform}",
-                            {"platform": platform, "query": query, "backoff_min": minutes, "detail": str(exc)})
+                _tech_error(db, f"Scraping bloqué — {platform}", {
+                    "platform": platform, "query": query, "backoff_min": minutes,
+                    "reason": getattr(exc, "reason", None), "http_status": getattr(exc, "status", None),
+                    "page_title": getattr(exc, "title", None), "page_url": getattr(exc, "url", None),
+                    "detail": str(exc),
+                })
+                logger.warning("Bloqué sur %s : reason=%s status=%s url=%s", platform,
+                               getattr(exc, "reason", None), getattr(exc, "status", None),
+                               getattr(exc, "url", None))
                 stats["blocked"].append(platform)
                 break  # stop poli sur cette plateforme
             except SelectorsBroken as exc:

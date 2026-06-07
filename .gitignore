@@ -34,3 +34,7 @@ db_data/
 
 # --- Sauvegardes locales (J9) ---
 backups/
+
+# --- Scraper state & debug (J runtime) ---
+scraper-state/
+scraper-debug/
