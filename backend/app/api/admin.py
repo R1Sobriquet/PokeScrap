@@ -6,15 +6,16 @@ seule source de vérité pour les mutations. Aucune logique métier ici.
 
 from __future__ import annotations
 
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, BackgroundTasks, Depends, HTTPException
 from pydantic import BaseModel
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.auth.security import get_current_user
-from app.config import invalidate_setting
+from app.config import get_setting, invalidate_setting
 from app.db import get_db
 from app.models import Setting, TrackedSet, Watchlist
+from app.services import jobs as jobs_service
 from app.services.interactions import handle_palier_confirm
 from app.services.liquidation_service import intake_lot, promote_to_position, segment_lot
 from app.services.portfolio import record_deposit
@@ -121,6 +122,43 @@ def promote(item_id: int, db: Session = Depends(get_db)) -> dict:
 @router.post("/alerts/{alert_id}/confirm")
 def confirm_alert(alert_id: int, db: Session = Depends(get_db)) -> dict:
     return handle_palier_confirm(db, alert_id)
+
+
+# ----------------------------------------------- jobs de pilotage à la demande
+def _job_run_dict(r) -> dict:
+    return {
+        "id": r.id, "job_name": r.job_name, "status": r.status,
+        "started_at": r.started_at.isoformat() if r.started_at else None,
+        "finished_at": r.finished_at.isoformat() if r.finished_at else None,
+        "summary": (r.result_json or {}).get("summary") if r.result_json else None,
+        "error_text": r.error_text,
+    }
+
+
+@router.post("/admin/jobs/{job_name}/run")
+def run_job(job_name: str, background: BackgroundTasks, db: Session = Depends(get_db)) -> dict:
+    """Démarre un job en arrière-plan (réponse immédiate). 409 si déjà en cours."""
+    if job_name not in jobs_service.JOBS:
+        raise HTTPException(status_code=404, detail="Job inconnu")
+    run_id = jobs_service.start_job(db, job_name)
+    if run_id is None:
+        raise HTTPException(status_code=409, detail="Ce job est déjà en cours")
+    background.add_task(jobs_service.execute_job, job_name, run_id)
+    return {"job_run_id": run_id, "job_name": job_name, "status": "running"}
+
+
+@router.get("/admin/jobs/recent")
+def jobs_recent(db: Session = Depends(get_db)) -> dict:
+    runs = [_job_run_dict(r) for r in jobs_service.recent_runs(db)]
+    watchlist_count = db.scalar(
+        select(func.count()).select_from(Watchlist).where(Watchlist.is_active == 1)
+    ) or 0
+    return {
+        "jobs": list(jobs_service.JOBS),
+        "runs": runs,
+        "watchlist_count": int(watchlist_count),
+        "poketrace_daily_limit": int(float(get_setting("poketrace_daily_limit", default=250))),
+    }
 
 
 class WatchlistUpdate(BaseModel):

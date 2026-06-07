@@ -54,11 +54,17 @@ def cmd_seed_catalog(args: argparse.Namespace) -> None:
     logger.info("seed-catalog: %s", result)
 
 
-def cmd_refresh_prices(args: argparse.Namespace) -> None:
+def _run_named_job(name: str) -> None:
+    """CLI = même runner que l'endpoint REST (source de vérité unique)."""
+    from app.services.jobs import run_job_sync
+
     with SessionLocal() as db:
-        ensure_runtime_settings(db)
-        written = ingest_watchlist_prices(db)
-    logger.info("refresh-prices: %s snapshots écrits", written)
+        result = run_job_sync(db, name)
+    logger.info("%s: %s", name, result.get("summary", result))
+
+
+def cmd_refresh_prices(args: argparse.Namespace) -> None:
+    _run_named_job("refresh-prices")
 
 
 def cmd_record_deposit(args: argparse.Namespace) -> None:
@@ -107,10 +113,7 @@ def cmd_pe_scan(args: argparse.Namespace) -> None:
 
 
 def cmd_evaluate_sales(args: argparse.Namespace) -> None:
-    with SessionLocal() as db:
-        ensure_runtime_settings(db)
-        result = evaluate_position_sales(db)
-    logger.info("evaluate-sales: %s", result)
+    _run_named_job("evaluate-sales")
 
 
 def cmd_kpis(args: argparse.Namespace) -> None:
@@ -120,10 +123,7 @@ def cmd_kpis(args: argparse.Namespace) -> None:
 
 
 def cmd_kpi_snapshot(args: argparse.Namespace) -> None:
-    with SessionLocal() as db:
-        ensure_runtime_settings(db)
-        result = run_kpi_snapshot(db)
-    logger.info("kpi-snapshot: %s", result)
+    _run_named_job("kpi-snapshot")
 
 
 def cmd_purge_sourcing(args: argparse.Namespace) -> None:
@@ -208,13 +208,9 @@ def cmd_record_backup(args: argparse.Namespace) -> None:
 
 def cmd_sync_tracked_sets(args: argparse.Namespace) -> None:
     from app.services.schema_migrations import ensure_schema_upgrades
-    from app.services.tracked_sets import ensure_default_tracked_sets, sync_tracked_sets
 
-    ensure_schema_upgrades(_engine_for_cli())
-    with SessionLocal() as db:
-        ensure_runtime_settings(db)
-        ensure_default_tracked_sets(db)
-        logger.info("sync-tracked-sets: %s", sync_tracked_sets(db))
+    ensure_schema_upgrades(_engine_for_cli())  # CLI peut tourner avant la migration backend
+    _run_named_job("sync-tracked-sets")
 
 
 def cmd_scan_movers(args: argparse.Namespace) -> None:
