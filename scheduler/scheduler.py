@@ -27,9 +27,11 @@ from app.services.health_status import record_heartbeat, run_dead_mans_switch, t
 from app.services.ingestion import ingest_watchlist_prices
 from app.services.kpi_snapshot import run_kpi_snapshot
 from app.services.pe_signal_service import run_pe_accumulation_scan
+from app.services.movers import compute_top_movers
 from app.services.retention import prune_price_snapshots
 from app.services.runtime_settings import ensure_runtime_settings
 from app.services.selling_service import evaluate_position_sales
+from app.services.tracked_sets import ensure_default_tracked_sets, sync_tracked_sets
 
 setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("scheduler")
@@ -70,6 +72,22 @@ def prune_snapshots() -> None:
         ensure_runtime_settings(db)
         result = prune_price_snapshots(db)
     logger.info("prune_snapshots: %s", result)
+
+
+def sync_sets() -> None:
+    # Intervalle long (1×/jour) : on économise le quota PokeTrace (250/j).
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        ensure_default_tracked_sets(db)
+        result = sync_tracked_sets(db, provider=_get_provider())
+    logger.info("sync_tracked_sets: %s", result)
+
+
+def scan_movers() -> None:
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        movers = compute_top_movers(db)
+    logger.info("scan_movers: %s top movers", len(movers))
 
 
 def refresh_prices() -> None:
@@ -135,6 +153,9 @@ def main() -> None:
     scheduler.add_job(
         prune_snapshots, CronTrigger(hour=4, minute=15, timezone=TIMEZONE), id="prune_snapshots"
     )
+    # Auto-watchlist par set : 1×/jour (quota). Top movers : après le refresh prix.
+    scheduler.add_job(sync_sets, CronTrigger(hour=5, minute=0, timezone=TIMEZONE), id="sync_tracked_sets")
+    scheduler.add_job(scan_movers, CronTrigger(hour=6, minute=30, timezone=TIMEZONE), id="scan_movers")
     logger.info(
         "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly, deadman=30m).",
         TIMEZONE,

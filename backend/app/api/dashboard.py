@@ -322,6 +322,18 @@ def status(db: Session = Depends(get_db)) -> dict:
     return get_status(db)
 
 
+@router.get("/movers")
+def movers(
+    db: Session = Depends(get_db),
+    set_slug: str | None = Query(default=None, alias="set"),
+    limit: int | None = Query(default=None),
+) -> list[dict]:
+    """Top movers (radar) : hausse confirmée par le volume. Signale, n'achète pas."""
+    from app.services.movers import compute_top_movers
+
+    return compute_top_movers(db, set_slug=set_slug, limit=limit)
+
+
 @router.get("/tiers")
 def tiers(db: Session = Depends(get_db)) -> list[dict]:
     return [

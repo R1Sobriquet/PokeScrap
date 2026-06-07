@@ -206,6 +206,31 @@ def cmd_record_backup(args: argparse.Namespace) -> None:
     logger.info("record-backup: horodatage de sauvegarde enregistré")
 
 
+def cmd_sync_tracked_sets(args: argparse.Namespace) -> None:
+    from app.services.schema_migrations import ensure_schema_upgrades
+    from app.services.tracked_sets import ensure_default_tracked_sets, sync_tracked_sets
+
+    ensure_schema_upgrades(_engine_for_cli())
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        ensure_default_tracked_sets(db)
+        logger.info("sync-tracked-sets: %s", sync_tracked_sets(db))
+
+
+def cmd_scan_movers(args: argparse.Namespace) -> None:
+    from app.services.movers import compute_top_movers
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        movers = compute_top_movers(db, set_slug=args.set)
+    logger.info("scan-movers (%s): %s", args.set or "tous", movers)
+
+
+def _engine_for_cli():
+    from app.db import engine
+    return engine
+
+
 def build_parser() -> argparse.ArgumentParser:
     parser = argparse.ArgumentParser(prog="app.cli")
     sub = parser.add_subparsers(dest="command", required=True)
@@ -262,6 +287,12 @@ def build_parser() -> argparse.ArgumentParser:
     p_cert = sub.add_parser("verify-cert", help="Vérifie l'authenticité d'un cert PSA")
     p_cert.add_argument("cert_number")
     p_cert.set_defaults(func=cmd_verify_cert)
+
+    sub.add_parser("sync-tracked-sets", help="Peuple la watchlist depuis les sets suivis").set_defaults(func=cmd_sync_tracked_sets)
+
+    p_mov = sub.add_parser("scan-movers", help="Affiche les top movers (hausse + volume)")
+    p_mov.add_argument("--set", default=None, help="Filtrer sur un set_slug")
+    p_mov.set_defaults(func=cmd_scan_movers)
 
     sub.add_parser("status", help="Agrégat d'observabilité (fraîcheur jobs/backup)").set_defaults(func=cmd_status)
     sub.add_parser("dead-mans-switch", help="Vérifie les jobs silencieux → tech_error").set_defaults(func=cmd_dead_mans_switch)

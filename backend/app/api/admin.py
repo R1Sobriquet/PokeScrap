@@ -14,7 +14,7 @@ from sqlalchemy.orm import Session
 from app.auth.security import get_current_user
 from app.config import invalidate_setting
 from app.db import get_db
-from app.models import Setting, Watchlist
+from app.models import Setting, TrackedSet, Watchlist
 from app.services.interactions import handle_palier_confirm
 from app.services.liquidation_service import intake_lot, promote_to_position, segment_lot
 from app.services.portfolio import record_deposit
@@ -129,6 +129,67 @@ class WatchlistUpdate(BaseModel):
     is_trinity: bool | None = None
     is_illustration_rare: bool | None = None
     is_active: bool | None = None
+
+
+@router.get("/tracked-sets")
+def list_tracked_sets(db: Session = Depends(get_db)) -> list[dict]:
+    return [
+        {
+            "id": t.id, "set_slug": t.set_slug, "name": t.name,
+            "is_active": bool(t.is_active), "min_value_eur": float(t.min_value_eur),
+            "include_single": bool(t.include_single), "include_sealed": bool(t.include_sealed),
+            "included_families": t.included_families,
+        }
+        for t in db.scalars(select(TrackedSet).order_by(TrackedSet.name)).all()
+    ]
+
+
+class TrackedSetUpdate(BaseModel):
+    is_active: bool | None = None
+    min_value_eur: float | None = None
+    include_single: bool | None = None
+    include_sealed: bool | None = None
+    name: str | None = None
+
+
+@router.put("/tracked-sets/{set_id}")
+def update_tracked_set(set_id: int, payload: TrackedSetUpdate, db: Session = Depends(get_db)) -> dict:
+    ts = db.get(TrackedSet, set_id)
+    if ts is None:
+        raise HTTPException(status_code=404, detail="Set suivi inconnu")
+    if payload.is_active is not None:
+        ts.is_active = 1 if payload.is_active else 0
+    if payload.min_value_eur is not None:
+        ts.min_value_eur = payload.min_value_eur
+    if payload.include_single is not None:
+        ts.include_single = 1 if payload.include_single else 0
+    if payload.include_sealed is not None:
+        ts.include_sealed = 1 if payload.include_sealed else 0
+    if payload.name is not None:
+        ts.name = payload.name
+    db.commit()
+    return {"id": set_id, "status": "ok"}
+
+
+class TrackedSetIn(BaseModel):
+    set_slug: str
+    name: str
+    min_value_eur: float = 0.0
+    include_single: bool = True
+    include_sealed: bool = True
+
+
+@router.post("/tracked-sets")
+def create_tracked_set(payload: TrackedSetIn, db: Session = Depends(get_db)) -> dict:
+    if db.scalar(select(TrackedSet).where(TrackedSet.set_slug == payload.set_slug)):
+        raise HTTPException(status_code=409, detail="Set déjà suivi")
+    ts = TrackedSet(set_slug=payload.set_slug, name=payload.name, is_active=1,
+                    min_value_eur=payload.min_value_eur,
+                    include_single=1 if payload.include_single else 0,
+                    include_sealed=1 if payload.include_sealed else 0)
+    db.add(ts)
+    db.commit()
+    return {"id": ts.id, "status": "ok"}
 
 
 @router.put("/watchlist/{product_id}")
