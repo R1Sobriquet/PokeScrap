@@ -201,6 +201,25 @@ class PokeTracePriceProvider(PriceProvider):
         )
         return _result_list(data)
 
+    def search_page(self, query: str, *, market: str, limit: int = 50, cursor: str | None = None) -> dict:
+        """Une page de recherche : ``{items, next_cursor}`` (pagination par cursor).
+
+        L'API renvoie ``{data:[...], pagination:{hasMore, nextCursor, count}}``.
+        ``next_cursor`` vaut ``None`` quand il n'y a plus de page.
+        """
+        q = " ".join(str(query).split()).lower()
+        params = {"search": q, "market": market, "limit": limit}
+        if cursor:
+            params["cursor"] = cursor
+        data = self._client.get("/cards", params=params)
+        items = _result_list(data)
+        next_cursor = None
+        if isinstance(data, dict):
+            pag = data.get("pagination") or {}
+            if isinstance(pag, dict) and pag.get("hasMore"):
+                next_cursor = pag.get("nextCursor")
+        return {"items": items, "next_cursor": next_cursor}
+
     def get_card(self, card_id: str, *, market: str) -> dict:
         data = self._client.get(f"/cards/{card_id}", params={"market": market})
         return _result_obj(data)

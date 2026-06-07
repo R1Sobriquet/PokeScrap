@@ -119,6 +119,15 @@ def _platform_enabled(platform: str) -> bool:
 def scrape_sourcing(db: Session, providers: list, *, now: dt.datetime | None = None) -> dict:
     """Boucle de sourcing best-effort. Ne lève jamais."""
     now = now or _utcnow()
+    # Constat : Vinted (DataDome, page-piège 200) et LeBoncoin (403 DataDome) sont
+    # infranchissables sans course à l'armement (refusée). Le scraping auto est donc
+    # désactivé par défaut ; le code reste en place pour réactivation future. Le
+    # sourcing MANUEL (evaluate_listing sur une annonce fournie) reste pleinement OK.
+    if not bool(get_setting("sourcing_scraping_enabled", default=False)):
+        logger.info("scraping désactivé (sourcing_scraping_enabled=false) — run ignoré.")
+        return {"status": "disabled", "scraped": 0, "new": 0, "duplicates": 0,
+                "blocked": [], "errors": 0, "disabled": [getattr(p, "platform", "?") for p in providers]}
+
     max_listings = int(float(get_setting("scrape_max_listings_per_run", default=40)))
     cooldown_cap = int(float(get_setting("scrape_blocked_cooldown_min", default=120)))
     # Rythme lent : une (ou peu de) recherche par source par run pour commencer.

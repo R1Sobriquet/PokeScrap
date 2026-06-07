@@ -21,6 +21,8 @@ from app.config import get_settings
 from app.db import SessionLocal, check_db, engine
 from app.logging_config import setup_logging
 from app.services.runtime_settings import ensure_runtime_settings
+from app.services.schema_migrations import ensure_schema_upgrades
+from app.services.tracked_sets import ensure_default_tracked_sets
 
 setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("backend")
@@ -66,9 +68,11 @@ async def lifespan(app: FastAPI):
     logger.info("Démarrage backend.")
     check_db()
     verify_schema()
+    ensure_schema_upgrades(engine)  # migrations légères (tracked_sets, watchlist.source)
     ensure_admin_hash()
     with SessionLocal() as db:
         ensure_runtime_settings(db)
+        ensure_default_tracked_sets(db)
     logger.info("Backend prêt.")
     yield
     logger.info("Arrêt backend.")
