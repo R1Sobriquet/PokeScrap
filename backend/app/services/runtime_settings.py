@@ -30,6 +30,10 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("scrape_blocked_cooldown_min", "120", "int", "Cooldown max (min) après blocage plateforme"),
     ("selector_break_threshold", "30", "int", "% de cartes sans champ obligatoire = structure cassée"),
     ('saved_queries', '["lot cartes pokemon","display prismatic evolutions"]', "json", "Requêtes de sourcing sauvegardées"),
+    ("job_heartbeat_max_age_min", "720", "int", "Âge max (min) d'un job critique avant dead-man's switch"),
+    ("price_snapshot_detail_days", "60", "int", "Fenêtre détaillée des price_snapshots"),
+    ("price_snapshot_pruning_enabled", "false", "bool", "Active l'élagage intraday des price_snapshots"),
+    ("log_redact_secrets", "true", "bool", "Masque les secrets dans les logs"),
 ]
 
 

@@ -451,4 +451,9 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 ('scrape_max_listings_per_run','40','int','Plafond d''annonces traitées par run de scraping'),
 ('scrape_blocked_cooldown_min','120','int','Cooldown max (min) après blocage plateforme (backoff)'),
 ('selector_break_threshold','30','int','% de cartes sans champ obligatoire = structure cassée'),
-('saved_queries','["lot cartes pokemon","display prismatic evolutions"]','json','Requêtes de sourcing sauvegardées');
+('saved_queries','["lot cartes pokemon","display prismatic evolutions"]','json','Requêtes de sourcing sauvegardées'),
+-- J9 — Durcissement / observabilité / rétention
+('job_heartbeat_max_age_min','720','int','Âge max (min) d''un job critique avant dead-man''s switch'),
+('price_snapshot_detail_days','60','int','Fenêtre détaillée des price_snapshots (au-delà : 1/jour/tier)'),
+('price_snapshot_pruning_enabled','false','bool','Active l''élagage intraday des price_snapshots'),
+('log_redact_secrets','true','bool','Masque les secrets dans les logs');

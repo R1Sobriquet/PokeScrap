@@ -19,9 +19,10 @@ from app.api import api_router
 from app.auth.security import ensure_admin_hash
 from app.config import get_settings
 from app.db import SessionLocal, check_db, engine
+from app.logging_config import setup_logging
 from app.services.runtime_settings import ensure_runtime_settings
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s [%(levelname)s] %(message)s")
+setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("backend")
 
 EXPECTED_TABLES = 14
