@@ -21,20 +21,53 @@ from app.models import Product, Watchlist
 logger = logging.getLogger("services.catalog_seed")
 
 
-def _first(card: dict, *keys: str) -> Any:
+def _scalar(value: Any, *subkeys: str) -> Any:
+    """Réduit une valeur à un scalaire. Si ``value`` est un dict, tente ``subkeys``
+    (sinon ``None``) ; jamais un dict/list ne sort d'ici → aucune colonne scalaire
+    ne reçoit du structuré."""
+    if isinstance(value, dict):
+        for k in subkeys:
+            v = value.get(k)
+            if isinstance(v, (str, int, float)):
+                return v
+        return None
+    if isinstance(value, (list, tuple)):
+        return None
+    return value
+
+
+def _set_fields(card: dict, entry: dict) -> tuple[Any, Any]:
+    """Extrait (set_name, set_slug) — ``set`` peut être un dict {name, slug} ou un str."""
+    s = card.get("set")
+    if isinstance(s, dict):
+        name, slug = s.get("name"), s.get("slug")
+    else:
+        name = s if isinstance(s, str) else _scalar(card.get("setName"))
+        slug = _scalar(card.get("setSlug")) or _scalar(card.get("set_slug"))
+    return (entry.get("set") or name, entry.get("set_slug") or slug)
+
+
+def _ref(card: dict, *keys: str) -> str | None:
+    """Extrait un identifiant marketplace scalaire depuis ``refs`` (tolère objets)."""
+    refs = card.get("refs") or {}
+    if not isinstance(refs, dict):
+        return None
     for key in keys:
-        if card.get(key) not in (None, ""):
-            return card[key]
+        v = refs.get(key)
+        if isinstance(v, dict):
+            v = v.get("id") or v.get("value")
+        if v not in (None, ""):
+            return str(v)
     return None
 
 
-def _refs(card: dict) -> dict:
-    return card.get("refs") or {}
-
-
 def upsert_product(db: Session, card: dict, entry: dict) -> Product:
-    """Crée ou met à jour le ``products`` correspondant à une carte PokeTrace."""
-    poketrace_id = card.get("id")
+    """Crée ou met à jour le ``products`` correspondant à une carte PokeTrace.
+
+    Chaque champ imbriqué (``set``, ``refs``, ``image``, ``language``…) est réduit
+    à sa valeur scalaire ; aucune colonne ne reçoit un dict brut.
+    """
+    poketrace_id = _scalar(card.get("id"))
     product = None
     if poketrace_id:
         product = db.scalar(
@@ -44,19 +77,21 @@ def upsert_product(db: Session, card: dict, entry: dict) -> Product:
         product = Product(poketrace_id=poketrace_id)
         db.add(product)
 
-    refs = _refs(card)
+    set_name, set_slug = _set_fields(card, entry)
+    number = entry.get("card_number") or _scalar(card.get("cardNumber")) or _scalar(card.get("number"))
+    image = _scalar(card.get("image"), "large", "small", "url") or _scalar(card.get("imageUrl"))
+
     product.product_type = entry.get("product_type", "single")
-    product.name = entry.get("name") or _first(card, "name") or entry.get("search", "")
-    product.set_name = entry.get("set") or _first(card, "set", "setName")
-    product.set_slug = entry.get("set_slug") or _first(card, "setSlug", "set_slug")
-    product.card_number = str(
-        entry.get("card_number") or _first(card, "number", "cardNumber") or ""
-    ) or None
-    product.rarity = entry.get("rarity") or _first(card, "rarity")
-    product.language = entry.get("language") or _first(card, "language") or "EN"
-    product.cardmarket_id = _first(refs, "cardmarket", "cardmarket_id") or product.cardmarket_id
-    product.tcgplayer_id = _first(refs, "tcgplayer", "tcgplayer_id") or product.tcgplayer_id
-    product.image_url = _first(card, "image", "imageUrl") or product.image_url
+    product.name = entry.get("name") or _scalar(card.get("name")) or entry.get("search", "")
+    product.set_name = set_name
+    product.set_slug = set_slug
+    product.card_number = (str(number) if number not in (None, "") else None)
+    product.variant = entry.get("variant") or _scalar(card.get("variant"))
+    product.rarity = entry.get("rarity") or _scalar(card.get("rarity"))
+    product.language = entry.get("language") or _scalar(card.get("language"), "code", "name") or "EN"
+    product.cardmarket_id = _ref(card, "cardmarketId", "cardmarket", "cardmarket_id") or product.cardmarket_id
+    product.tcgplayer_id = _ref(card, "tcgplayerId", "tcgplayer", "tcgplayer_id") or product.tcgplayer_id
+    product.image_url = image or product.image_url
     db.flush()  # garantit product.id pour la watchlist
     return product
 
