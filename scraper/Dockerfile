@@ -1,8 +1,11 @@
-# Conteneur scraper : Playwright (paquet + navigateur Chromium) installés
-# explicitement, indépendamment de l'image de base. Construit depuis la racine du
-# repo pour partager ./backend/app (services sourcing/matching/évaluation).
+# Conteneur scraper : Playwright (paquet + Chromium) installés explicitement.
+# Base épinglée sur **bookworm** : sur Debian trixie, `playwright install
+# --with-deps` réclame des paquets de polices obsolètes (ttf-unifont,
+# ttf-ubuntu-font-family) qui n'existent plus → on pose nous-mêmes les deps
+# système (noms bookworm valides) et on installe le navigateur SANS --with-deps.
+# Construit depuis la racine du repo pour partager ./backend/app.
 #   build: { context: ., dockerfile: scraper/Dockerfile }
-FROM python:3.12-slim
+FROM python:3.12-slim-bookworm
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \
@@ -10,13 +13,24 @@ ENV PYTHONUNBUFFERED=1 \
 
 WORKDIR /app
 
-# Dépendances : backend (sqlalchemy, pymysql, bs4, pyyaml…) + APScheduler + playwright.
+# Dépendances système de Chromium headless (une seule couche apt).
+RUN apt-get update && apt-get install -y --no-install-recommends \
+      libnss3 libnspr4 \
+      libatk1.0-0 libatk-bridge2.0-0 libatspi2.0-0 \
+      libcups2 libdrm2 libgbm1 libasound2 \
+      libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 \
+      libx11-6 libxcb1 libxext6 \
+      libpango-1.0-0 libcairo2 \
+      fonts-unifont fonts-liberation \
+    && rm -rf /var/lib/apt/lists/*
+
+# Dépendances Python : backend (sqlalchemy, pymysql, bs4, pyyaml…) + APScheduler + playwright.
 COPY backend/requirements.txt /tmp/backend-requirements.txt
 COPY scraper/requirements.txt /tmp/scraper-requirements.txt
 RUN pip install --no-cache-dir -r /tmp/backend-requirements.txt -r /tmp/scraper-requirements.txt
 
-# Navigateur Chromium + dépendances système nécessaires à Playwright.
-RUN playwright install --with-deps chromium
+# Navigateur seul (les deps système sont déjà posées ci-dessus → pas de --with-deps).
+RUN playwright install chromium
 
 # Code applicatif partagé + code scraper + sélecteurs externalisés.
 COPY backend/app /app/app
