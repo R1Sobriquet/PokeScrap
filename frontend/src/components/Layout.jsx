@@ -10,6 +10,7 @@ const NAV = [
   { to: "/lots", label: "Lots & Liquidation" },
   { to: "/ledger", label: "Ledger & Fiscalité" },
   { to: "/grading", label: "Grading" },
+  { to: "/jobs", label: "Actions & Jobs" },
   { to: "/reglages", label: "Réglages" },
 ];
 

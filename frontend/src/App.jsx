@@ -11,6 +11,7 @@ import Sets from "./pages/Sets.jsx";
 import Lots from "./pages/Lots.jsx";
 import Ledger from "./pages/Ledger.jsx";
 import Grading from "./pages/Grading.jsx";
+import Jobs from "./pages/Jobs.jsx";
 import Settings from "./pages/Settings.jsx";
 
 export default function App() {
@@ -34,6 +35,7 @@ export default function App() {
             <Route path="/lots" element={<Lots />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/grading" element={<Grading />} />
+            <Route path="/jobs" element={<Jobs />} />
             <Route path="/reglages" element={<Settings />} />
           </Route>
           <Route path="*" element={<Navigate to="/cockpit" replace />} />
