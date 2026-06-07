@@ -40,16 +40,53 @@ def ensure_default_tracked_sets(db: Session) -> int:
 
 
 # ---------------------------------------------------------------- pur (testable)
+def _norm_slug(s: str | None) -> str:
+    s = (s or "").strip().lower().replace("_", "-").replace(" ", "-")
+    while "--" in s:
+        s = s.replace("--", "-")
+    return s.strip("-")
+
+
+def set_slug_matches(api_slug: str | None, tracked_slug: str | None) -> bool:
+    """Rapprochement robuste : l'API préfixe la série (ex. ``sv-``).
+
+    ``sv-prismatic-evolutions`` matche le set suivi ``prismatic-evolutions`` ;
+    ``sv-151`` matche ``151``.
+    """
+    if not tracked_slug:
+        return True
+    a, t = _norm_slug(api_slug), _norm_slug(tracked_slug)
+    if not a or not t:
+        return False
+    if a == t or a.endswith("-" + t) or t.endswith("-" + a):
+        return True
+    t_seg = t.split("-")
+    if len(t_seg) == 1:               # slug mono-segment (ex. "151") → segment de l'API
+        return t in a.split("-")
+    return t in a                     # multi-segments contigus
+
+
+#: Familles considérées comme "scellé" (réelles, vérifiées). Les accessoires
+#: (sleeves, binders, playmats…) ne sont PAS des produits d'investissement → exclus.
+_SEALED_FAMILIES = frozenset({
+    "booster_box", "booster_pack", "booster_bundle", "booster_display",
+    "elite_trainer_box", "box_collection", "collection_box", "bundle",
+    "premium_collection", "tin", "blister",
+})
+
+
 def card_product_type(card: dict) -> str | None:
-    """Type normalisé : 'single' | 'sealed' (déduit de productType/Family)."""
+    """Type normalisé : 'single' | 'sealed' (déduit de productType/Family).
+
+    'accessory' (et tout type non investissable) → ``None`` (donc exclu).
+    """
     ptype = (_scalar(card.get("productType")) or "").lower()
     if ptype in ("single", "sealed"):
         return ptype
     family = (_scalar(card.get("productFamily")) or "").lower()
     if family == "card":
         return "single"
-    if family in ("booster_box", "booster_pack", "booster_bundle", "elite_trainer_box",
-                  "booster_display", "bundle", "collection_box"):
+    if family in _SEALED_FAMILIES:
         return "sealed"
     return None
 
@@ -116,44 +153,76 @@ def _upsert_auto_watchlist(db: Session, product, value: float) -> str:
 
 
 def sync_tracked_sets(db: Session, *, provider=None, now: dt.datetime | None = None) -> dict:
-    """Peuple/rafraîchit la watchlist depuis les sets actifs. Respecte le quota."""
+    """Peuple/rafraîchit la watchlist depuis les sets actifs. Respecte le quota.
+
+    Comptage honnête : tout produit reçu puis rejeté est compté avec sa raison
+    (``mismatch_set`` / ``type_non_suivi`` / ``sous_min_value`` / ``sans_valeur``).
+    """
     provider = provider or PokeTracePriceProvider()
     market = str(get_setting("valuation_market", default="US"))
     max_pages = int(float(get_setting("tracked_sets_max_pages", default=5)))
     page_size = int(float(get_setting("tracked_sets_page_size", default=50)))
 
-    stats = {"sets": 0, "added": 0, "updated": 0, "skipped": 0, "skipped_manual": 0, "requests": 0}
+    stats = {"sets": 0, "received": 0, "added": 0, "updated": 0, "skipped_manual": 0,
+             "requests": 0,
+             "rejected": {"mismatch_set": 0, "type_non_suivi": 0, "sous_min_value": 0, "sans_valeur": 0}}
     sets = db.scalars(select(TrackedSet).where(TrackedSet.is_active == 1)).all()
 
     for tracked in sets:
         stats["sets"] += 1
+        per_set = {"received": 0, "kept": 0, "mismatch_set": 0, "type_non_suivi": 0,
+                   "sous_min_value": 0, "sans_valeur": 0}
         cursor = None
         for _page in range(max_pages):
             page = provider.search_page(tracked.name, market=market, limit=page_size, cursor=cursor)
             stats["requests"] += 1
             for card in page.get("items", []):
-                # Restreint au bon set quand le slug est connu (anti-bruit cross-set).
-                slug = _scalar(card.get("set"), "slug") if isinstance(card.get("set"), dict) else _scalar(card.get("setSlug"))
-                if tracked.set_slug and slug and slug.lower() != tracked.set_slug.lower():
+                stats["received"] += 1
+                per_set["received"] += 1
+
+                api_slug = (_scalar(card.get("set"), "slug") if isinstance(card.get("set"), dict)
+                            else _scalar(card.get("setSlug")))
+                if not set_slug_matches(api_slug, tracked.set_slug):
+                    stats["rejected"]["mismatch_set"] += 1
+                    per_set["mismatch_set"] += 1
                     continue
+
+                ptype = card_product_type(card)
                 if not card_passes_filters(
                     card, include_single=bool(tracked.include_single),
                     include_sealed=bool(tracked.include_sealed),
                     included_families=tracked.included_families,
                 ):
-                    stats["skipped"] += 1
+                    stats["rejected"]["type_non_suivi"] += 1
+                    per_set["type_non_suivi"] += 1
                     continue
+
                 value = card_value(card)
-                if value is None or value < float(tracked.min_value_eur):
-                    stats["skipped"] += 1
+                if value is None:
+                    stats["rejected"]["sans_valeur"] += 1
+                    per_set["sans_valeur"] += 1
                     continue
-                product = upsert_product(db, card, {})
+                if value < float(tracked.min_value_eur):
+                    stats["rejected"]["sous_min_value"] += 1
+                    per_set["sous_min_value"] += 1
+                    continue
+
+                product = upsert_product(db, card, {"product_type": ptype})
                 action = _upsert_auto_watchlist(db, product, value)
-                stats[action if action in stats else "skipped"] += 1
+                stats[action] = stats.get(action, 0) + 1
+                per_set["kept"] += 1
+
             cursor = page.get("next_cursor")
             if not cursor:
                 break
         db.commit()
+        logger.info(
+            "set '%s' (slug=%s) : reçus=%s retenus=%s rejetés={mismatch_set:%s, type_non_suivi:%s, "
+            "sous_min_value:%s, sans_valeur:%s}",
+            tracked.name, tracked.set_slug, per_set["received"], per_set["kept"],
+            per_set["mismatch_set"], per_set["type_non_suivi"],
+            per_set["sous_min_value"], per_set["sans_valeur"],
+        )
 
     logger.info("sync-tracked-sets : %s", stats)
     return stats
