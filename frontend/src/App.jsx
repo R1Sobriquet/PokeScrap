@@ -7,6 +7,7 @@ import Cockpit from "./pages/Cockpit.jsx";
 import Opportunities from "./pages/Opportunities.jsx";
 import Portfolio from "./pages/Portfolio.jsx";
 import Watchlist from "./pages/Watchlist.jsx";
+import Sets from "./pages/Sets.jsx";
 import Lots from "./pages/Lots.jsx";
 import Ledger from "./pages/Ledger.jsx";
 import Grading from "./pages/Grading.jsx";
@@ -29,6 +30,7 @@ export default function App() {
             <Route path="/opportunites" element={<Opportunities />} />
             <Route path="/portefeuille" element={<Portfolio />} />
             <Route path="/watchlist" element={<Watchlist />} />
+            <Route path="/sets" element={<Sets />} />
             <Route path="/lots" element={<Lots />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/grading" element={<Grading />} />

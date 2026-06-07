@@ -6,6 +6,7 @@ const NAV = [
   { to: "/opportunites", label: "Opportunités" },
   { to: "/portefeuille", label: "Portefeuille" },
   { to: "/watchlist", label: "Watchlist" },
+  { to: "/sets", label: "Sets & Movers" },
   { to: "/lots", label: "Lots & Liquidation" },
   { to: "/ledger", label: "Ledger & Fiscalité" },
   { to: "/grading", label: "Grading" },
