@@ -22,6 +22,7 @@ vi.mock("../api.js", () => ({
 import { AuthProvider } from "../AuthContext.jsx";
 import Cockpit from "../pages/Cockpit.jsx";
 import Settings from "../pages/Settings.jsx";
+import Jobs from "../pages/Jobs.jsx";
 import App from "../App.jsx";
 
 const wrap = (ui) => render(<AuthProvider>{ui}</AuthProvider>);
@@ -69,5 +70,35 @@ describe("Auth", () => {
   it("protège les routes : non connecté → écran de login", () => {
     render(<App />);
     expect(screen.getByText("Se connecter")).toBeInTheDocument();
+  });
+});
+
+describe("Actions & Jobs", () => {
+  it("rend les boutons, désactive un job en cours, et lance un job", async () => {
+    h.polled["/admin/jobs/recent"] = {
+      jobs: ["sync-tracked-sets", "refresh-prices", "scan-movers", "evaluate-sales", "kpi-snapshot"],
+      runs: [
+        { id: 2, job_name: "sync-tracked-sets", status: "running", started_at: "2026-06-05T12:00:00" },
+        { id: 1, job_name: "kpi-snapshot", status: "done", finished_at: "2026-06-05T11:01:00",
+          summary: "snapshot 2026-06-05" },
+      ],
+      watchlist_count: 240,
+      poketrace_daily_limit: 250,
+    };
+    wrap(<Jobs />);
+
+    // Les 5 actions sont rendues.
+    expect(screen.getByText("Synchroniser les sets")).toBeInTheDocument();
+    expect(screen.getByText("Rafraîchir les prix")).toBeInTheDocument();
+    // Le job en cours affiche "En cours…" et son bouton est désactivé.
+    const running = screen.getByText("En cours…");
+    expect(running).toBeDisabled();
+    // Avertissement quota (240 > 200) présent.
+    expect(screen.getByText(/risque de dépassement/)).toBeInTheDocument();
+
+    // Lancer un job appelle l'endpoint run.
+    fireEvent.click(screen.getAllByText("Lancer")[0]);
+    await waitFor(() => expect(h.post).toHaveBeenCalled());
+    expect(h.post.mock.calls[0][1]).toMatch(/^\/admin\/jobs\/.+\/run$/);
   });
 });
