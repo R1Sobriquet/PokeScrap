@@ -44,6 +44,39 @@ class QuotaExceeded(RuntimeError):
     """Levée quand le budget de requêtes du jour est épuisé."""
 
 
+#: Clés de tableau de résultats possibles selon l'enveloppe de la réponse.
+_LIST_KEYS = ("data", "cards", "results", "items", "history")
+#: Clés d'objet (détail) possibles.
+_OBJ_KEYS = ("data", "card", "result")
+
+
+def _result_list(payload) -> list[dict]:
+    """Extrait le tableau de résultats, quelle que soit l'enveloppe.
+
+    La réponse réelle de PokeTrace enveloppe les résultats sous ``data`` (avec un
+    objet ``pagination`` à côté) ; on tolère aussi une liste nue ou d'autres clés.
+    """
+    if isinstance(payload, list):
+        return payload
+    if isinstance(payload, dict):
+        for key in _LIST_KEYS:
+            value = payload.get(key)
+            if isinstance(value, list):
+                return value
+    return []
+
+
+def _result_obj(payload) -> dict:
+    """Extrait l'objet de détail, en dépliant une éventuelle enveloppe ``data``."""
+    if isinstance(payload, dict):
+        for key in _OBJ_KEYS:
+            value = payload.get(key)
+            if isinstance(value, dict):
+                return value
+        return payload
+    return {}
+
+
 def iter_price_points(card: dict) -> Iterator[tuple[str, str, dict]]:
     """Aplatit ``card['prices']`` en triplets ``(marketplace, tier, point)``.
 
@@ -160,21 +193,20 @@ class PokeTracePriceProvider(PriceProvider):
         return self._client
 
     def search_cards(self, query: str, *, market: str, limit: int = 20) -> list[dict]:
+        # Normalisation de la requête (espaces superflus, casse) par sécurité ;
+        # la recherche serveur est insensible à la casse.
+        q = " ".join(str(query).split()).lower()
         data = self._client.get(
-            "/cards", params={"search": query, "market": market, "limit": limit}
+            "/cards", params={"search": q, "market": market, "limit": limit}
         )
-        if isinstance(data, list):
-            return data
-        return data.get("cards", [])
+        return _result_list(data)
 
     def get_card(self, card_id: str, *, market: str) -> dict:
         data = self._client.get(f"/cards/{card_id}", params={"market": market})
-        return data  # type: ignore[return-value]
+        return _result_obj(data)
 
     def get_price_history(self, card_id: str, tier: str, *, market: str) -> list[dict]:
         data = self._client.get(
             f"/cards/{card_id}/prices/{tier}/history", params={"market": market}
         )
-        if isinstance(data, list):
-            return data
-        return data.get("history", [])
+        return _result_list(data)
