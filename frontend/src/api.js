@@ -40,6 +40,7 @@ export const api = {
   get: (token, path) => apiFetch(token, path),
   put: (token, path, body) => apiFetch(token, path, { method: "PUT", body }),
   post: (token, path, body) => apiFetch(token, path, { method: "POST", body }),
+  del: (token, path) => apiFetch(token, path, { method: "DELETE" }),
 };
 
 export const exportUrl = (path) => `${API_URL}${path}`;
