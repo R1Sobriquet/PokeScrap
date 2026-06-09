@@ -97,7 +97,11 @@ def upsert_product(db: Session, card: dict, entry: dict) -> Product:
 
 
 def upsert_watchlist(db: Session, product: Product, entry: dict) -> Watchlist:
-    """Crée ou met à jour la ligne de watchlist d'un produit."""
+    """Crée ou met à jour la ligne de watchlist d'un produit.
+
+    ``entry['source']`` (défaut 'manual') marque l'origine — une entrée 'manual'
+    n'est jamais écrasée par le sync auto des sets.
+    """
     watch = db.scalar(
         select(Watchlist).where(Watchlist.product_id == product.id)
     )
@@ -105,6 +109,7 @@ def upsert_watchlist(db: Session, product: Product, entry: dict) -> Watchlist:
         watch = Watchlist(product_id=product.id)
         db.add(watch)
 
+    watch.source = entry.get("source", "manual")
     watch.tier = entry.get("tier", "B")
     watch.is_trinity = 1 if entry.get("is_trinity") else 0
     watch.is_illustration_rare = 1 if entry.get("is_illustration_rare") else 0
@@ -161,3 +166,35 @@ def seed_catalog(
         result["skipped"],
     )
     return result
+
+
+def add_manual_watchlist(
+    db: Session,
+    *,
+    search: str,
+    provider: PriceProvider | None = None,
+    market: str = "US",
+    **overrides,
+) -> dict:
+    """Ajout manuel d'un produit à la watchlist (réutilise ``seed_catalog``).
+
+    Lance la recherche PokeTrace, upsert le produit, et ajoute en watchlist avec
+    ``source='manual'`` (jamais écrasé par le sync auto). Si la recherche ne
+    renvoie rien : aucune création, statut ``not_found``.
+    """
+    if not (search and search.strip()):
+        return {"status": "empty_search", "message": "Le texte de recherche est requis."}
+
+    entry = {"search": search.strip(), "source": "manual"}
+    entry.update({k: v for k, v in overrides.items() if v is not None})
+
+    result = seed_catalog(db, [entry], provider=provider, market=market)
+    if result["products"] == 0:
+        return {"status": "not_found",
+                "message": f"Aucun produit trouvé pour « {search.strip()} »."}
+
+    product = db.scalar(
+        select(Product).order_by(Product.id.desc())
+    )  # le dernier upsert ; suffisant pour le retour UI
+    return {"status": "ok", "message": "Produit ajouté à la watchlist (manuel).",
+            "product_id": product.id if product else None, **result}

@@ -219,15 +219,64 @@ class TrackedSetIn(BaseModel):
 
 @router.post("/tracked-sets")
 def create_tracked_set(payload: TrackedSetIn, db: Session = Depends(get_db)) -> dict:
-    if db.scalar(select(TrackedSet).where(TrackedSet.set_slug == payload.set_slug)):
+    slug = (payload.set_slug or "").strip()
+    if not slug:
+        raise HTTPException(status_code=400, detail="Le slug est requis")
+    if payload.min_value_eur < 0:
+        raise HTTPException(status_code=400, detail="La valeur min doit être >= 0")
+    if db.scalar(select(TrackedSet).where(TrackedSet.set_slug == slug)):
         raise HTTPException(status_code=409, detail="Set déjà suivi")
-    ts = TrackedSet(set_slug=payload.set_slug, name=payload.name, is_active=1,
+    ts = TrackedSet(set_slug=slug, name=payload.name or slug, is_active=1,
                     min_value_eur=payload.min_value_eur,
                     include_single=1 if payload.include_single else 0,
                     include_sealed=1 if payload.include_sealed else 0)
     db.add(ts)
     db.commit()
     return {"id": ts.id, "status": "ok"}
+
+
+@router.delete("/tracked-sets/{set_id}")
+def delete_tracked_set(set_id: int, db: Session = Depends(get_db)) -> dict:
+    ts = db.get(TrackedSet, set_id)
+    if ts is None:
+        raise HTTPException(status_code=404, detail="Set suivi inconnu")
+    db.delete(ts)
+    db.commit()
+    return {"id": set_id, "status": "deleted"}
+
+
+class WatchlistAddIn(BaseModel):
+    search: str
+    name: str | None = None
+    set: str | None = None
+    card_number: str | None = None
+    language: str | None = None
+    product_type: str = "single"
+    tier: str = "B"
+    is_trinity: bool = False
+    is_illustration_rare: bool = False
+    keywords: str | None = None
+
+
+@router.post("/watchlist")
+def add_watchlist(payload: WatchlistAddIn, db: Session = Depends(get_db)) -> dict:
+    """Création manuelle (recherche PokeTrace + upsert), source='manual'."""
+    from app.config import get_setting
+    from app.services.catalog_seed import add_manual_watchlist
+
+    res = add_manual_watchlist(
+        db, search=payload.search,
+        market=str(get_setting("valuation_market", default="US")),
+        name=payload.name, set=payload.set, card_number=payload.card_number,
+        language=payload.language, product_type=payload.product_type, tier=payload.tier,
+        is_trinity=payload.is_trinity, is_illustration_rare=payload.is_illustration_rare,
+        keywords=payload.keywords,
+    )
+    if res["status"] == "empty_search":
+        raise HTTPException(status_code=400, detail=res["message"])
+    if res["status"] == "not_found":
+        raise HTTPException(status_code=404, detail=res["message"])
+    return res
 
 
 @router.put("/watchlist/{product_id}")
