@@ -23,6 +23,8 @@ import { AuthProvider } from "../AuthContext.jsx";
 import Cockpit from "../pages/Cockpit.jsx";
 import Settings from "../pages/Settings.jsx";
 import Jobs from "../pages/Jobs.jsx";
+import Sets from "../pages/Sets.jsx";
+import Watchlist from "../pages/Watchlist.jsx";
 import App from "../App.jsx";
 
 const wrap = (ui) => render(<AuthProvider>{ui}</AuthProvider>);
@@ -100,5 +102,44 @@ describe("Actions & Jobs", () => {
     fireEvent.click(screen.getAllByText("Lancer")[0]);
     await waitFor(() => expect(h.post).toHaveBeenCalled());
     expect(h.post.mock.calls[0][1]).toMatch(/^\/admin\/jobs\/.+\/run$/);
+  });
+});
+
+describe("Sets — ajout d'un set cible", () => {
+  it("ouvre le formulaire, valide le slug requis, puis POST", async () => {
+    h.polled["/tracked-sets"] = [
+      { id: 1, name: "PE", set_slug: "pe", min_value_eur: 5, include_single: true, include_sealed: true, is_active: true },
+    ];
+    h.polled["/movers"] = [];
+    wrap(<Sets />);
+
+    fireEvent.click(screen.getByText("+ Ajouter un set cible"));
+    // slug vide → message de validation, pas d'appel.
+    fireEvent.click(screen.getByText("Ajouter"));
+    expect(screen.getByText(/slug est requis/i)).toBeInTheDocument();
+    expect(h.post).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/Slug/i), { target: { value: "151" } });
+    fireEvent.click(screen.getByText("Ajouter"));
+    await waitFor(() => expect(h.post).toHaveBeenCalled());
+    expect(h.post.mock.calls[0][1]).toBe("/tracked-sets");
+  });
+});
+
+describe("Watchlist — ajout manuel", () => {
+  it("rend le formulaire et affiche 'aucun résultat' sur 404", async () => {
+    h.polled["/watchlist"] = [];
+    h.polled["/alerts?status=pending"] = [];
+    h.post.mockRejectedValueOnce(new Error("API 404 sur /watchlist"));
+    wrap(<Watchlist />);
+
+    fireEvent.click(screen.getByText("+ Ajouter une carte/produit"));
+    fireEvent.change(screen.getByLabelText(/Recherche PokeTrace/i), { target: { value: "Inexistant" } });
+    fireEvent.click(screen.getByText("Ajouter"));
+
+    await waitFor(() => expect(h.post).toHaveBeenCalled());
+    expect(h.post.mock.calls[0][1]).toBe("/watchlist");
+    expect(h.post.mock.calls[0][2].search).toBe("Inexistant");
+    expect(await screen.findByText(/Aucun produit trouvé pour cette recherche/i)).toBeInTheDocument();
   });
 });
