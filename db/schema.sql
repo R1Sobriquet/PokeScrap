@@ -354,6 +354,70 @@ CREATE TABLE alerts (
     CONSTRAINT fk_alert_position FOREIGN KEY (position_id)         REFERENCES positions (id)         ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ----------------------- PokéStock FR : retailers -------------------
+CREATE TABLE retailers (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    code         VARCHAR(32)  NOT NULL,
+    name         VARCHAR(128) NOT NULL,
+    base_url     VARCHAR(255) NULL,
+    sitemap_url  VARCHAR(512) NULL,
+    is_active    TINYINT(1)   NOT NULL DEFAULT 1,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_retailer_code (code)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ----------------------- PokéStock FR : retail_offers ---------------
+CREATE TABLE retail_offers (
+    id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    retailer_id         BIGINT UNSIGNED NOT NULL,
+    retailer_sku        VARCHAR(128) NULL,
+    url                 VARCHAR(512) NOT NULL,
+    title               VARCHAR(255) NULL,
+    product_type        VARCHAR(16)  NOT NULL DEFAULT 'autre',
+    current_stock_state ENUM('in_stock','out_of_stock','preorder','unknown') NOT NULL DEFAULT 'unknown',
+    current_price       DECIMAL(8,2) NULL,
+    currency            CHAR(3)      NOT NULL DEFAULT 'EUR',
+    is_watched          TINYINT(1)   NOT NULL DEFAULT 0,
+    product_id          BIGINT UNSIGNED NULL,
+    first_seen_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    last_checked_at     DATETIME     NULL,
+    last_changed_at     DATETIME     NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_retail_offer_url (url),
+    KEY idx_retailer_watched (retailer_id, is_watched),
+    KEY idx_stock_state (current_stock_state),
+    CONSTRAINT fk_offer_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE CASCADE,
+    CONSTRAINT fk_offer_product  FOREIGN KEY (product_id)  REFERENCES products (id)  ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------- PokéStock FR : retail_stock_events -------------
+CREATE TABLE retail_stock_events (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    offer_id    BIGINT UNSIGNED NOT NULL,
+    from_state  VARCHAR(16)  NULL,
+    to_state    VARCHAR(16)  NOT NULL,
+    price       DECIMAL(8,2) NULL,
+    detected_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_offer_detected (offer_id, detected_at),
+    CONSTRAINT fk_event_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------- PokéStock FR : releases ----------------
+CREATE TABLE releases (
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    set_name      VARCHAR(255) NULL,
+    product_name  VARCHAR(255) NOT NULL,
+    product_type  VARCHAR(16)  NULL,
+    release_date  DATE         NULL,
+    preorder_date DATE         NULL,
+    source_note   VARCHAR(512) NULL,
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_release_date (release_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================================
 --  SEED — Paliers
 -- =====================================================================
@@ -364,6 +428,14 @@ VALUES
     (2, 'Étape 2 — Arbitrage + PE', 300.00, 1000.00, NULL,  NULL,  10.00, NULL, 'Arbitrage continu + premiers stocks Prismatic Evolutions.'),
     (3, 'Étape 3 — Diversification',1000.00,2500.00, NULL,  NULL,   5.00, JSON_OBJECT('arbitrage',60,'sealed',40), 'Portefeuille diversifié, 60% arbitrage / 40% scellé.'),
     (4, 'Étape 4 — Institutionnel', 2500.00,5000.00, NULL,  NULL,   5.00, NULL, 'PE, Pokémon 151, Displays JP, cartes gradées PSA.');
+
+-- =====================================================================
+--  SEED — PokéStock FR : détaillants V1 (sitemap_url à confirmer au go-live)
+-- =====================================================================
+INSERT INTO retailers (code, name, base_url, sitemap_url, is_active) VALUES
+    ('cultura',    'Cultura',    'https://www.cultura.com',   'https://www.cultura.com/sitemap.xml',    1),
+    ('fnac',       'Fnac',       'https://www.fnac.com',      'https://www.fnac.com/sitemap_index.xml', 1),
+    ('micromania', 'Micromania', 'https://www.micromania.fr', 'https://www.micromania.fr/sitemap.xml',  1);
 
 -- =====================================================================
 --  SEED — Registre complet des paramètres (settings)
@@ -496,4 +568,16 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 ('job_heartbeat_max_age_min','720','int','Âge max (min) d''un job critique avant dead-man''s switch'),
 ('price_snapshot_detail_days','60','int','Fenêtre détaillée des price_snapshots (au-delà : 1/jour/tier)'),
 ('price_snapshot_pruning_enabled','false','bool','Active l''élagage intraday des price_snapshots'),
-('log_redact_secrets','true','bool','Masque les secrets dans les logs');
+('log_redact_secrets','true','bool','Masque les secrets dans les logs'),
+-- PokéStock FR — veille restock (défauts prudents : sourcing OFF, dry-run ON)
+('retail_sourcing_enabled','false','bool','Active le sourcing veille restock (master switch PokéStock FR)'),
+('retail_dry_run','true','bool','Mode dry-run : log les transitions sans créer d''alerte'),
+('retail_cultura_enabled','true','bool','Active le détaillant Cultura'),
+('retail_fnac_enabled','false','bool','Active le détaillant Fnac (WAF agressif : prudence)'),
+('retail_micromania_enabled','true','bool','Active le détaillant Micromania'),
+('retail_check_interval_min','60','int','Intervalle min (min) entre deux checks restock d''une offre'),
+('retail_request_cap_per_run','40','int','Plafond de requêtes HTTP par run de job retail'),
+('retail_min_delay_ms','3000','int','Délai min (ms) entre deux requêtes vers un même détaillant'),
+('retail_restock_cooldown_min','360','int','Cooldown (min) avant ré-alerte sur une même offre'),
+('retail_circuit_max_errors','5','int','Erreurs consécutives avant circuit breaker d''un détaillant'),
+('telegram_enabled','false','bool','Active les notifications Telegram (token/chat_id dans .env)');

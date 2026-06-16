@@ -42,6 +42,18 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("price_snapshot_detail_days", "60", "int", "Fenêtre détaillée des price_snapshots"),
     ("price_snapshot_pruning_enabled", "false", "bool", "Active l'élagage intraday des price_snapshots"),
     ("log_redact_secrets", "true", "bool", "Masque les secrets dans les logs"),
+    # PokéStock FR — veille restock (défauts prudents : sourcing OFF, dry-run ON)
+    ("retail_sourcing_enabled", "false", "bool", "Active le sourcing veille restock (master switch PokéStock FR)"),
+    ("retail_dry_run", "true", "bool", "Mode dry-run : log les transitions sans créer d'alerte"),
+    ("retail_cultura_enabled", "true", "bool", "Active le détaillant Cultura"),
+    ("retail_fnac_enabled", "false", "bool", "Active le détaillant Fnac (WAF agressif : prudence)"),
+    ("retail_micromania_enabled", "true", "bool", "Active le détaillant Micromania"),
+    ("retail_check_interval_min", "60", "int", "Intervalle min (min) entre deux checks restock d'une offre"),
+    ("retail_request_cap_per_run", "40", "int", "Plafond de requêtes HTTP par run de job retail"),
+    ("retail_min_delay_ms", "3000", "int", "Délai min (ms) entre deux requêtes vers un même détaillant"),
+    ("retail_restock_cooldown_min", "360", "int", "Cooldown (min) avant ré-alerte sur une même offre"),
+    ("retail_circuit_max_errors", "5", "int", "Erreurs consécutives avant circuit breaker d'un détaillant"),
+    ("telegram_enabled", "false", "bool", "Active les notifications Telegram (token/chat_id dans .env)"),
 ]
 
 
