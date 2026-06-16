@@ -14,7 +14,15 @@ from sqlalchemy.orm import Session
 from app.auth.security import get_current_user
 from app.config import get_setting, invalidate_setting
 from app.db import get_db
-from app.models import Setting, TrackedSet, Watchlist
+from app.models import (
+    Release,
+    RetailOffer,
+    RetailStockEvent,
+    Retailer,
+    Setting,
+    TrackedSet,
+    Watchlist,
+)
 from app.services import jobs as jobs_service
 from app.services.interactions import handle_palier_confirm
 from app.services.liquidation_service import intake_lot, promote_to_position, segment_lot
@@ -297,3 +305,242 @@ def update_watchlist(product_id: int, payload: WatchlistUpdate, db: Session = De
         watch.is_active = 1 if payload.is_active else 0
     db.commit()
     return {"product_id": product_id, "status": "ok"}
+
+
+# ===================================================== PokéStock FR (veille restock)
+from urllib.parse import urlparse  # noqa: E402
+
+from app.retail import politeness  # noqa: E402
+from app.retail.domain import Retailer as RetailerDC  # noqa: E402
+from app.retail.fetch import HttpRetailSource, RetailBlocked  # noqa: E402
+
+
+def _utcnow():
+    import datetime as _dt
+
+    return _dt.datetime.now(_dt.timezone.utc).replace(tzinfo=None)
+
+
+def _retailer_dict(r: Retailer, db: Session) -> dict:
+    now = _utcnow()
+    return {
+        "id": r.id, "code": r.code, "name": r.name,
+        "base_url": r.base_url, "sitemap_url": r.sitemap_url,
+        "is_active": bool(r.is_active),
+        "enabled": bool(get_setting(f"retail_{r.code}_enabled", default=False)),
+        "error_count": politeness.retailer_error_count(db, r.code),
+        "circuit_open": politeness.is_retailer_blocked(db, r.code, now),
+        "offers": db.scalar(
+            select(func.count()).select_from(RetailOffer).where(RetailOffer.retailer_id == r.id)
+        ) or 0,
+    }
+
+
+@router.get("/retail/retailers")
+def list_retailers(db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(select(Retailer).order_by(Retailer.name)).all()
+    return [_retailer_dict(r, db) for r in rows]
+
+
+class RetailerUpdate(BaseModel):
+    is_active: bool | None = None
+    sitemap_url: str | None = None
+    reset_circuit: bool | None = None
+
+
+@router.put("/retail/retailers/{retailer_id}")
+def update_retailer(retailer_id: int, payload: RetailerUpdate, db: Session = Depends(get_db)) -> dict:
+    r = db.get(Retailer, retailer_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Détaillant inconnu")
+    if payload.is_active is not None:
+        r.is_active = 1 if payload.is_active else 0
+    if payload.sitemap_url is not None:
+        r.sitemap_url = payload.sitemap_url.strip() or None
+    if payload.reset_circuit:
+        politeness.clear_retailer_errors(db, r.code)
+    db.commit()
+    return _retailer_dict(r, db)
+
+
+def _offer_dict(o: RetailOffer, retailer_name: str | None = None) -> dict:
+    return {
+        "id": o.id, "retailer_id": o.retailer_id, "retailer": retailer_name,
+        "url": o.url, "title": o.title, "product_type": o.product_type,
+        "stock_state": o.current_stock_state,
+        "price": float(o.current_price) if o.current_price is not None else None,
+        "currency": o.currency, "is_watched": bool(o.is_watched),
+        "last_checked_at": o.last_checked_at.isoformat() if o.last_checked_at else None,
+        "last_changed_at": o.last_changed_at.isoformat() if o.last_changed_at else None,
+    }
+
+
+@router.get("/retail/offers")
+def list_offers(watched: bool = True, db: Session = Depends(get_db)) -> list[dict]:
+    names = {r.id: r.name for r in db.scalars(select(Retailer)).all()}
+    stmt = select(RetailOffer)
+    if watched:
+        stmt = stmt.where(RetailOffer.is_watched == 1)
+    stmt = stmt.order_by(RetailOffer.last_changed_at.desc().nullslast(), RetailOffer.id.desc())
+    return [_offer_dict(o, names.get(o.retailer_id)) for o in db.scalars(stmt).all()]
+
+
+class OfferWatchUpdate(BaseModel):
+    is_watched: bool
+
+
+@router.put("/retail/offers/{offer_id}")
+def update_offer(offer_id: int, payload: OfferWatchUpdate, db: Session = Depends(get_db)) -> dict:
+    o = db.get(RetailOffer, offer_id)
+    if o is None:
+        raise HTTPException(status_code=404, detail="Offre inconnue")
+    o.is_watched = 1 if payload.is_watched else 0
+    db.commit()
+    return {"id": offer_id, "is_watched": bool(o.is_watched), "status": "ok"}
+
+
+@router.delete("/retail/offers/{offer_id}")
+def delete_offer(offer_id: int, db: Session = Depends(get_db)) -> dict:
+    o = db.get(RetailOffer, offer_id)
+    if o is None:
+        raise HTTPException(status_code=404, detail="Offre inconnue")
+    db.delete(o)
+    db.commit()
+    return {"id": offer_id, "status": "deleted"}
+
+
+class OfferAddIn(BaseModel):
+    url: str
+    retailer_code: str | None = None
+
+
+def _match_retailer(db: Session, url: str, code: str | None) -> Retailer | None:
+    if code:
+        return db.scalar(select(Retailer).where(Retailer.code == code))
+    host = (urlparse(url).hostname or "").lower()
+    for r in db.scalars(select(Retailer)).all():
+        rhost = (urlparse(r.base_url or "").hostname or "").lower()
+        if rhost and (rhost in host or host in rhost):
+            return r
+    return None
+
+
+@router.post("/retail/offers")
+def add_offer(payload: OfferAddIn, db: Session = Depends(get_db)) -> dict:
+    """Ajoute une offre à la veille par URL (fetch best-effort immédiat, non bloquant)."""
+    url = (payload.url or "").strip()
+    if not url.startswith("http"):
+        raise HTTPException(status_code=400, detail="URL invalide")
+    retailer = _match_retailer(db, url, payload.retailer_code)
+    if retailer is None:
+        raise HTTPException(status_code=400, detail="Détaillant introuvable pour cette URL (préciser retailer_code)")
+    existing = db.scalar(select(RetailOffer).where(RetailOffer.url == url))
+    if existing is not None:
+        existing.is_watched = 1
+        db.commit()
+        return {"id": existing.id, "status": "already_exists", "watched": True}
+
+    offer = RetailOffer(retailer_id=retailer.id, url=url[:512],
+                        current_stock_state="unknown", is_watched=1)
+    db.add(offer)
+    db.flush()
+    # Fetch best-effort : ne casse jamais l'ajout (politesse : un seul GET).
+    note = "ajoutée (état à rafraîchir par le job)"
+    try:
+        source = HttpRetailSource(RetailerDC(retailer.code, retailer.name, retailer.base_url))
+        snap = source.fetch_offer(url)
+        offer.current_stock_state = snap.stock_state
+        if snap.price is not None:
+            offer.current_price = snap.price
+        if snap.title:
+            offer.title = snap.title[:255]
+        offer.last_checked_at = _utcnow()
+        if snap.stock_state in ("in_stock", "preorder", "out_of_stock"):
+            db.add(RetailStockEvent(offer_id=offer.id, from_state="unknown",
+                                    to_state=snap.stock_state, price=snap.price,
+                                    detected_at=_utcnow()))
+        note = f"ajoutée (état {snap.stock_state})"
+    except RetailBlocked:
+        note = "ajoutée (détaillant a bloqué le fetch immédiat)"
+    except Exception:  # noqa: BLE001
+        note = "ajoutée (fetch immédiat indisponible)"
+    db.commit()
+    return {"id": offer.id, "status": "ok", "stock_state": offer.current_stock_state, "note": note}
+
+
+# --------------------------------------------------------------- releases (calendrier)
+def _release_dict(r: Release) -> dict:
+    return {
+        "id": r.id, "set_name": r.set_name, "product_name": r.product_name,
+        "product_type": r.product_type,
+        "release_date": r.release_date.isoformat() if r.release_date else None,
+        "preorder_date": r.preorder_date.isoformat() if r.preorder_date else None,
+        "source_note": r.source_note,
+    }
+
+
+@router.get("/releases")
+def list_releases(db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(select(Release).order_by(Release.release_date.asc().nullslast())).all()
+    return [_release_dict(r) for r in rows]
+
+
+class ReleaseIn(BaseModel):
+    product_name: str
+    set_name: str | None = None
+    product_type: str | None = None
+    release_date: str | None = None
+    preorder_date: str | None = None
+    source_note: str | None = None
+
+
+def _parse_date(value: str | None):
+    import datetime as _dt
+
+    if not value:
+        return None
+    try:
+        return _dt.date.fromisoformat(value)
+    except ValueError as exc:
+        raise HTTPException(status_code=400, detail="Date invalide (AAAA-MM-JJ)") from exc
+
+
+@router.post("/releases")
+def create_release(payload: ReleaseIn, db: Session = Depends(get_db)) -> dict:
+    if not (payload.product_name or "").strip():
+        raise HTTPException(status_code=400, detail="Le nom du produit est requis")
+    r = Release(
+        product_name=payload.product_name.strip(),
+        set_name=payload.set_name, product_type=payload.product_type,
+        release_date=_parse_date(payload.release_date),
+        preorder_date=_parse_date(payload.preorder_date),
+        source_note=payload.source_note,
+    )
+    db.add(r)
+    db.commit()
+    return _release_dict(r)
+
+
+@router.put("/releases/{release_id}")
+def update_release(release_id: int, payload: ReleaseIn, db: Session = Depends(get_db)) -> dict:
+    r = db.get(Release, release_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Sortie inconnue")
+    r.product_name = payload.product_name.strip() or r.product_name
+    r.set_name = payload.set_name
+    r.product_type = payload.product_type
+    r.release_date = _parse_date(payload.release_date)
+    r.preorder_date = _parse_date(payload.preorder_date)
+    r.source_note = payload.source_note
+    db.commit()
+    return _release_dict(r)
+
+
+@router.delete("/releases/{release_id}")
+def delete_release(release_id: int, db: Session = Depends(get_db)) -> dict:
+    r = db.get(Release, release_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Sortie inconnue")
+    db.delete(r)
+    db.commit()
+    return {"id": release_id, "status": "deleted"}
