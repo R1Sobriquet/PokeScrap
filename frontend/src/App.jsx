@@ -12,6 +12,9 @@ import Lots from "./pages/Lots.jsx";
 import Ledger from "./pages/Ledger.jsx";
 import Grading from "./pages/Grading.jsx";
 import Jobs from "./pages/Jobs.jsx";
+import Restock from "./pages/Restock.jsx";
+import Retailers from "./pages/Retailers.jsx";
+import Calendar from "./pages/Calendar.jsx";
 import Settings from "./pages/Settings.jsx";
 
 export default function App() {
@@ -35,6 +38,9 @@ export default function App() {
             <Route path="/lots" element={<Lots />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/grading" element={<Grading />} />
+            <Route path="/restock" element={<Restock />} />
+            <Route path="/detaillants" element={<Retailers />} />
+            <Route path="/calendrier" element={<Calendar />} />
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/reglages" element={<Settings />} />
           </Route>

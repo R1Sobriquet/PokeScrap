@@ -10,8 +10,12 @@ const JOB_LABELS = {
   "scan-movers": "Scanner les top movers",
   "evaluate-sales": "Évaluer les ventes",
   "kpi-snapshot": "Snapshot KPI",
+  "retail-check-restocks": "Veille restock (check)",
+  "retail-detect-new-skus": "Détecter nouveaux SKU",
+  "retail-refresh-prices": "Rafraîchir prix retail",
 };
-const ORDER = ["sync-tracked-sets", "refresh-prices", "scan-movers", "evaluate-sales", "kpi-snapshot"];
+const ORDER = ["sync-tracked-sets", "refresh-prices", "scan-movers", "evaluate-sales", "kpi-snapshot",
+  "retail-check-restocks", "retail-detect-new-skus", "retail-refresh-prices"];
 const QUOTA_WARN = 200;  // > X produits suivis : risque de dépasser le quota Free (250/j)
 
 function sevFor(status) {
