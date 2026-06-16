@@ -14,6 +14,10 @@ from app.models.position import Position
 from app.models.price_snapshot import PriceSnapshot
 from app.models.product import Product
 from app.models.psa_cert import PsaCert
+from app.models.release import Release
+from app.models.retail_offer import RetailOffer
+from app.models.retail_stock_event import RetailStockEvent
+from app.models.retailer import Retailer
 from app.models.setting import Setting
 from app.models.sourcing_listing import SourcingListing
 from app.models.tier import TierConfig
@@ -32,6 +36,10 @@ __all__ = [
     "PriceSnapshot",
     "Product",
     "PsaCert",
+    "Release",
+    "RetailOffer",
+    "RetailStockEvent",
+    "Retailer",
     "Setting",
     "SourcingListing",
     "TierConfig",
