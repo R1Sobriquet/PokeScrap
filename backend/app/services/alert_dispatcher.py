@@ -28,6 +28,11 @@ logger = logging.getLogger("services.alert_dispatcher")
 #: Filtres anti-erreurs : visibles au dashboard, jamais poussés en notification.
 BLOCKED_FILTERS = {"anti_pump", "illiquid", "anti_fomo"}
 
+#: Types dont la dédup est portée par le JOB (cooldown par offre) : les FK partagées
+#: (product_id/listing/position) sont nulles, donc la clé de dédup générique les
+#: confondrait. On les exempte du dedup dispatcher (PokéStock FR).
+DEDUP_EXEMPT = {"restock", "new_sku"}
+
 _SEVERITY_RANK = {"critical": 0, "warning": 1, "info": 2}
 
 
@@ -120,17 +125,18 @@ def dispatch_pending(db: Session, notifier: Notifier, *, now: dt.datetime | None
             stats["deferred"] += 1
             continue
 
-        key = _target_key(alert)
-        if key in sent_keys or _recent_send_exists(db, alert, cooldown, now):
-            stats["skipped"] += 1
-            continue
+        if alert.alert_type not in DEDUP_EXEMPT:
+            key = _target_key(alert)
+            if key in sent_keys or _recent_send_exists(db, alert, cooldown, now):
+                stats["skipped"] += 1
+                continue
+            sent_keys.add(key)
 
         rendered = render_alert(alert)
         ping = alert.severity == "critical"
         notifier.send(rendered.channel_key, rendered.embed, rendered.buttons, ping=ping)
         alert.sent_to_discord_at = now
         alert.status = "sent"
-        sent_keys.add(key)
         stats["sent"] += 1
         if ping:
             stats["pinged"] += 1

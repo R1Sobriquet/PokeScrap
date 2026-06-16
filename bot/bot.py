@@ -16,7 +16,9 @@ import os
 import discord
 from discord.ext import tasks
 
+from app.adapters.composite_notifier import CompositeNotifier
 from app.adapters.discord_notifier import DiscordNotifier
+from app.adapters.telegram_notifier import TelegramNotifier
 from app.config import get_setting
 from app.db import SessionLocal
 from app.models import Alert, SourcingListing
@@ -42,7 +44,10 @@ CHANNELS = {
     "ventes": os.getenv("DISCORD_CHANNEL_VENTES", ""),
     "portefeuille": os.getenv("DISCORD_CHANNEL_PORTEFEUILLE", ""),
     "systeme": os.getenv("DISCORD_CHANNEL_SYSTEME", ""),
+    "restock": os.getenv("DISCORD_CHANNEL_RESTOCK", ""),  # PokéStock FR
 }
+TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
+TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
 
 intents = discord.Intents.default()
 client = discord.Client(intents=intents)
@@ -222,7 +227,13 @@ def _post_startup_test_alert() -> None:
 async def on_ready() -> None:
     global notifier
     logger.info("Connecté en tant que %s.", client.user)
-    notifier = DiscordNotifier(client, {k: v for k, v in CHANNELS.items() if v}, PING_USER_ID or None)
+    discord_notifier = DiscordNotifier(
+        client, {k: v for k, v in CHANNELS.items() if v}, PING_USER_ID or None
+    )
+    # Fan-out Telegram (PokéStock FR) : n'agit que sur le canal "restock", et
+    # seulement si telegram_enabled + token/chat_id présents.
+    telegram_notifier = TelegramNotifier(TELEGRAM_TOKEN, TELEGRAM_CHAT_ID)
+    notifier = CompositeNotifier([discord_notifier, telegram_notifier])
 
     await asyncio.to_thread(_post_startup_test_alert)
 

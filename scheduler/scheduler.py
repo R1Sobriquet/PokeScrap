@@ -28,6 +28,7 @@ from app.services.ingestion import ingest_watchlist_prices
 from app.services.kpi_snapshot import run_kpi_snapshot
 from app.services.pe_signal_service import run_pe_accumulation_scan
 from app.services.movers import compute_top_movers
+from app.services.retail_jobs import run_check_restocks, run_detect_new_skus
 from app.services.retention import prune_price_snapshots
 from app.services.runtime_settings import ensure_runtime_settings
 from app.services.selling_service import evaluate_position_sales
@@ -116,6 +117,22 @@ def grading_scan() -> None:
     logger.info("grading_scan: %s", result)
 
 
+def retail_check_restocks() -> None:
+    # Veille restock sur la watchlist (intervalle prudent ; no-op si désactivé).
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_check_restocks(db)
+    logger.info("retail_check_restocks: %s", result.get("summary"))
+
+
+def retail_detect_new_skus() -> None:
+    # Radar nouveaux SKU via sitemaps (fréquence basse ; no-op si désactivé).
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_detect_new_skus(db)
+    logger.info("retail_detect_new_skus: %s", result.get("summary"))
+
+
 def refresh_history() -> None:
     if not bool(get_setting("feature_history_full", default=False)):
         logger.info("refresh_history différé : mode Free")
@@ -156,6 +173,14 @@ def main() -> None:
     # Auto-watchlist par set : 1×/jour (quota). Top movers : après le refresh prix.
     scheduler.add_job(sync_sets, CronTrigger(hour=5, minute=0, timezone=TIMEZONE), id="sync_tracked_sets")
     scheduler.add_job(scan_movers, CronTrigger(hour=6, minute=30, timezone=TIMEZONE), id="scan_movers")
+    # PokéStock FR — veille restock (prudent) : check watchlist toutes les 30 min,
+    # radar nouveaux SKU 2×/jour. No-op tant que retail_sourcing_enabled=false.
+    scheduler.add_job(retail_check_restocks, "interval", minutes=30, id="retail_check_restocks")
+    scheduler.add_job(
+        retail_detect_new_skus,
+        CronTrigger(hour="7,19", minute=15, timezone=TIMEZONE),
+        id="retail_detect_new_skus",
+    )
     logger.info(
         "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly, deadman=30m).",
         TIMEZONE,

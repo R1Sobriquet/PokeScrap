@@ -336,7 +336,7 @@ CREATE TABLE alerts (
     alert_type          ENUM('buy','sell_x2','sell_25_50_25','sell_forced','sell_reminder',
                              'cash_min','anti_pump','anti_fomo','illiquid','grading','reinvest',
                              'tax_provision','palier_up','palier_down','auction_reminder',
-                             'lot_summary','tech_error') NOT NULL,
+                             'lot_summary','tech_error','restock','new_sku') NOT NULL,
     severity            ENUM('info','warning','critical') NOT NULL DEFAULT 'info',
     product_id          BIGINT UNSIGNED NULL,
     sourcing_listing_id BIGINT UNSIGNED NULL,

@@ -155,3 +155,22 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                 "ALTER TABLE watchlist ADD COLUMN source VARCHAR(16) NOT NULL DEFAULT 'manual'"
             ))
             logger.info("Migration : colonne watchlist.source ajoutée.")
+
+        # PokéStock FR — étend l'ENUM alerts.alert_type (additif : valeurs existantes
+        # conservées) pour router les alertes restock/new_sku via le pipeline existant.
+        alert_type = conn.execute(
+            text(
+                "SELECT COLUMN_TYPE FROM information_schema.columns "
+                "WHERE table_schema = :db AND table_name = 'alerts' AND column_name = 'alert_type'"
+            ),
+            {"db": db_name},
+        ).scalar()
+        if alert_type and "'restock'" not in alert_type:
+            conn.execute(text(
+                "ALTER TABLE alerts MODIFY alert_type ENUM("
+                "'buy','sell_x2','sell_25_50_25','sell_forced','sell_reminder',"
+                "'cash_min','anti_pump','anti_fomo','illiquid','grading','reinvest',"
+                "'tax_provision','palier_up','palier_down','auction_reminder',"
+                "'lot_summary','tech_error','restock','new_sku') NOT NULL"
+            ))
+            logger.info("Migration : valeurs ENUM alerts.alert_type restock/new_sku ajoutées.")
