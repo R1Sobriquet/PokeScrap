@@ -43,6 +43,69 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 > price_snapshots 1/jour/tier), validation **Free→Pro** scriptée, compose durci
 > (localhost, `restart: unless-stopped`, healthchecks), et **runbooks** de go-live.
 
+## PokéStock FR — veille restock (détaillants FR)
+
+Module de veille stock pour collectionneurs : **détection de restock** sur une
+watchlist d'offres scellées, **détection de nouveaux SKU**, alertes **Discord
+(nouveau canal) + Telegram**. Cibles V1 : **Cultura, Fnac, Micromania**.
+
+- **Sourcing hybride léger (httpx, pas de Playwright).** Radar nouveaux SKU via
+  **sitemaps** ; état stock + prix via **fetch de la page produit** (JSON-LD
+  `Product`/`Offer` prioritaire, **fallback DOM** si absent). Tourne dans les
+  conteneurs existants (backend on-demand + scheduler).
+- **Politesse OBLIGATOIRE** : respect `robots.txt`, UA réaliste, intervalle min +
+  jitter, **plafond de requêtes/run**, **backoff exponentiel** sur 403/429 et
+  **circuit breaker** par détaillant (réutilise `scrape_state`). **Fnac** =
+  watchlist-only (jamais le catalogue). Aucune escalade anti-bot (pas de proxies,
+  pas de captcha).
+- **Tout est désactivable** : master switch `retail_sourcing_enabled` (défaut
+  **off**), flag par détaillant `retail_<code>_enabled`, et **mode dry-run**
+  `retail_dry_run` (défaut **on** : log les transitions sans alerter).
+- **Notifications** : une transition crée une ligne `alerts` (type `restock` /
+  `new_sku`) poussée par le dispatcher existant vers le canal Discord « restock »
+  **et** Telegram (chaque canal activable indépendamment). Dédup par transition
+  réelle + cooldown (`retail_restock_cooldown_min`).
+
+**Nouvelles tables** : `retailers` (seed Cultura/Fnac/Micromania), `retail_offers`
+(`product_id` nullable = hook scalping futur, `ON DELETE SET NULL`),
+`retail_stock_events`, `releases` (calendrier curé). Migration **additive et
+idempotente** (`CREATE TABLE IF NOT EXISTS`) ; rollback :
+`db/migrations/down_pokestock_fr.sql`.
+
+> ⚠️ **`sitemap_url` à confirmer au go-live.** Les URLs seedées sont best-effort :
+> vérifie chacune dans le `robots.txt` du site (`curl.exe https://www.cultura.com/robots.txt`)
+> et corrige-la dans l'écran **Détaillants** si besoin.
+
+**Jobs (panel + scheduler, verrou `job_runs`)** :
+
+```bash
+docker compose exec backend python -m app.cli  # ou via le panel « Actions & Jobs »
+# retail-check-restocks  : watchlist → fetch → transition → event + alerte
+# retail-detect-new-skus : sitemaps → diff → nouvelles offres (unknown) + alerte
+# retail-refresh-prices  : rafraîchit prix/état sans alerter
+```
+
+**Écrans** : *Veille restock* (offres watchées, ajout par URL), *Détaillants*
+(activation, compteurs d'erreurs / circuit breaker), *Calendrier* (CRUD releases).
+
+### Prérequis Telegram (@BotFather)
+
+1. Sur Telegram, parler à **@BotFather** → `/newbot` → récupérer le **token**.
+2. Récupérer le **chat_id** cible (envoyer un message au bot puis lire
+   `https://api.telegram.org/bot<token>/getUpdates`, ou via **@userinfobot**).
+3. Renseigner `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` dans `.env` (secrets, jamais
+   en base) et passer le setting `telegram_enabled=true`. Idem côté Discord :
+   `DISCORD_CHANNEL_RESTOCK`.
+
+### TODO — Indice de scalping (hors périmètre MVP, non implémenté)
+
+Prévu plus tard : croiser le **prix marché PokeTrace** (table `products` /
+`price_snapshots`) avec le **prix officiel détaillant** (`retail_offers.current_price`)
+pour repérer les écarts de scalping. Le point d'extension est déjà en place :
+`retail_offers.product_id` (FK nullable vers `products`, `ON DELETE SET NULL`).
+**Aucun code de scalping ni de fuzzy-matching automatique n'est livré** — le lien
+offre↔produit reste manuel/best-effort.
+
 ## Sourcing & auto-watchlist
 
 - **Scraping auto désactivé par défaut** (`sourcing_scraping_enabled=false`) :
@@ -322,7 +385,7 @@ re-hache automatiquement.
 ## Vérifications (Definition of Done)
 
 ```bash
-# Base : 14 tables, 4 paliers, registre settings > 80
+# Base : 18 tables (14 socle + 4 PokéStock FR), 4 paliers, registre settings > 80
 docker compose exec db mysql -uroot -p"$DB_ROOT_PASSWORD" pokemon_arbitrage \
   -e "SELECT COUNT(*) AS settings FROM settings; SELECT COUNT(*) AS tiers FROM tiers_config;"
 
