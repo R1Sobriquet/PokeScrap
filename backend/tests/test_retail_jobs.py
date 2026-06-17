@@ -107,7 +107,6 @@ def test_block_triggers_circuit_breaker_without_crash(db_session):
 
 def test_detect_new_skus_inserts_offers(db_session):
     _enable(db_session, dry_run=True)
-    Retailer  # noqa: B018
     r = Retailer(code="cultura", name="Cultura", is_active=1,
                  sitemap_url="https://c/sitemap.xml")
     db_session.add(r)
