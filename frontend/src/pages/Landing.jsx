@@ -267,7 +267,7 @@ export default function Landing() {
             desc={t("landing.feature.analyzer.desc")}
             link={t("landing.feature.analyzer.link")}
             accent="var(--green-text)"
-            onClick={() => navigate("/restock")}
+            onClick={() => navigate("/analyzer")}
           />
           <FeatureCard
             kicker={t("landing.feature.portfolio.kicker")}

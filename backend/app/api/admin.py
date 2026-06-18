@@ -468,6 +468,22 @@ def add_offer(payload: OfferAddIn, db: Session = Depends(get_db)) -> dict:
     return {"id": offer.id, "status": "ok", "stock_state": offer.current_stock_state, "note": note}
 
 
+# --------------------------------------------------------------- deal analyzer
+class AnalyzeIn(BaseModel):
+    url: str
+
+
+@router.post("/retail/analyze")
+def analyze_deal(payload: AnalyzeIn, db: Session = Depends(get_db)) -> dict:
+    """Note une annonce (prix annoncé vs prix marché PokeTrace) → verdict."""
+    from app.services.deal_analyzer import analyze_listing
+
+    result = analyze_listing(db, payload.url)
+    if result.get("status") == "invalid_url":
+        raise HTTPException(status_code=400, detail=result.get("message", "URL invalide"))
+    return result
+
+
 # --------------------------------------------------------------- releases (calendrier)
 def _release_dict(r: Release) -> dict:
     return {

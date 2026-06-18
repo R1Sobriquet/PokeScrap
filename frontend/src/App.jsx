@@ -19,6 +19,7 @@ import Restock from "./pages/Restock.jsx";
 import Retailers from "./pages/Retailers.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import FutureRadar from "./pages/FutureRadar.jsx";
+import DealAnalyzer from "./pages/DealAnalyzer.jsx";
 import Settings from "./pages/Settings.jsx";
 
 export default function App() {
@@ -49,6 +50,7 @@ export default function App() {
             <Route path="/detaillants" element={<Retailers />} />
             <Route path="/calendrier" element={<Calendar />} />
             <Route path="/future" element={<FutureRadar />} />
+            <Route path="/analyzer" element={<DealAnalyzer />} />
             <Route path="/jobs" element={<Jobs />} />
             <Route path="/reglages" element={<Settings />} />
           </Route>

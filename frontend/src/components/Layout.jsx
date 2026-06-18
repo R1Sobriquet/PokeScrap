@@ -12,6 +12,7 @@ const NAV_GROUPS = [
       { to: "/opportunites", key: "nav.opportunites" },
       { to: "/sets", key: "nav.sets" },
       { to: "/future", key: "nav.future" },
+      { to: "/analyzer", key: "nav.analyzer" },
       { to: "/watchlist", key: "nav.watchlist" },
       { to: "/restock", key: "nav.restock" },
       { to: "/detaillants", key: "nav.detaillants" },
