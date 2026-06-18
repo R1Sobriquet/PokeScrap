@@ -69,6 +69,12 @@ def _run_kpi_snapshot(db: Session) -> dict:
     return r
 
 
+def _run_train_release_model(db: Session) -> dict:
+    from app.ml.scorer import run_train_release_model
+
+    return run_train_release_model(db)
+
+
 JOBS = {
     "sync-tracked-sets": _run_sync_tracked_sets,
     "refresh-prices": _run_refresh_prices,
@@ -80,6 +86,8 @@ JOBS = {
     "retail-detect-new-skus": run_detect_new_skus,
     "retail-refresh-prices": run_refresh_prices,
     "retail-backfill-images": run_backfill_images,
+    # Future Radar — (ré)entraînement du modèle ML de scoring des sorties.
+    "train-release-model": _run_train_release_model,
 }
 
 

@@ -113,8 +113,25 @@ fuzzy-matching automatique persistant.
 
 Le dashboard adopte le design **PokéAlpha** : 4 thèmes runtime (dark/light/holo/
 ember), polices Outfit + JetBrains Mono, sélecteur de thème et **bascule de langue
-FR/EN** (`src/i18n.jsx`, `src/ThemeContext.jsx`), landing publique (`/`), et écran
-**Future Radar** (`/future`, scores provisoires en attendant un modèle prédictif).
+FR/EN** (`src/i18n.jsx`, `src/ThemeContext.jsx`), landing publique (`/`), **Set
+Explorer / Set Detail** (`/explorer`, `/set/:slug`) et **Future Radar** (`/future`).
+
+### Future Radar — modèle ML (scikit-learn)
+
+`app/ml/` entraîne trois régressseurs *gradient boosting* (`scikit-learn`) qui
+prédisent **hype / popularité / ROI** d'une sortie à partir de features produit
+(type, mots-clés ETB/UPC/booster…, langue). Les **cibles sont dérivées de
+signaux réels** de `price_snapshots` : ROI = momentum prix (`avg_1d` vs `avg_30d`),
+popularité = `sale_count`, hype = volatilité (`high−low`/`avg`). La **confiance**
+combine la complétude des données de la sortie et la taille du jeu d'entraînement.
+Le modèle est persisté en base (`ml_models`, payload joblib, caché par
+`trained_at`) ; l'inférence remplace l'heuristique dès qu'un modèle existe, sinon
+**repli automatique sur l'heuristique** (`app/services/release_scoring.py`).
+(Ré)entraînement : job **`train-release-model`** (panel + hebdo scheduler) ;
+en-deçà de 12 échantillons, l'entraînement est sauté (`données insuffisantes`).
+Parité train/serve garantie (mêmes features). Upgradeable vers des modèles plus
+riches sans changer l'interface (`scores` : `{hype, confidence, popularity, roi,
+model}`).
 
 ## Sourcing & auto-watchlist
 

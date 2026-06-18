@@ -487,23 +487,26 @@ def analyze_deal(payload: AnalyzeIn, db: Session = Depends(get_db)) -> dict:
 
 
 # --------------------------------------------------------------- releases (calendrier)
-def _release_dict(r: Release) -> dict:
+def _release_dict(r: Release, db: Session) -> dict:
+    """Scores : modèle ML s'il est entraîné, sinon repli sur l'heuristique."""
+    from app.ml.scorer import score_release_ml
     from app.services.release_scoring import score_release
 
+    scores = score_release_ml(db, r) or score_release(r)
     return {
         "id": r.id, "set_name": r.set_name, "product_name": r.product_name,
         "product_type": r.product_type,
         "release_date": r.release_date.isoformat() if r.release_date else None,
         "preorder_date": r.preorder_date.isoformat() if r.preorder_date else None,
         "source_note": r.source_note,
-        "scores": score_release(r),
+        "scores": scores,
     }
 
 
 @router.get("/releases")
 def list_releases(db: Session = Depends(get_db)) -> list[dict]:
     rows = db.scalars(select(Release).order_by(Release.release_date.asc().nullslast())).all()
-    return [_release_dict(r) for r in rows]
+    return [_release_dict(r, db) for r in rows]
 
 
 class ReleaseIn(BaseModel):
@@ -539,7 +542,7 @@ def create_release(payload: ReleaseIn, db: Session = Depends(get_db)) -> dict:
     )
     db.add(r)
     db.commit()
-    return _release_dict(r)
+    return _release_dict(r, db)
 
 
 @router.put("/releases/{release_id}")
@@ -554,7 +557,7 @@ def update_release(release_id: int, payload: ReleaseIn, db: Session = Depends(ge
     r.preorder_date = _parse_date(payload.preorder_date)
     r.source_note = payload.source_note
     db.commit()
-    return _release_dict(r)
+    return _release_dict(r, db)
 
 
 @router.delete("/releases/{release_id}")

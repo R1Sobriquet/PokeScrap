@@ -10,6 +10,7 @@ from app.models.grading_opportunity import GradingOpportunity
 from app.models.job_run import JobRun
 from app.models.lot import Lot
 from app.models.lot_item import LotItem
+from app.models.ml_model import MlModel
 from app.models.position import Position
 from app.models.price_snapshot import PriceSnapshot
 from app.models.product import Product
@@ -32,6 +33,7 @@ __all__ = [
     "JobRun",
     "Lot",
     "LotItem",
+    "MlModel",
     "Position",
     "PriceSnapshot",
     "Product",

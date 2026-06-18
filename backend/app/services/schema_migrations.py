@@ -130,6 +130,21 @@ INSERT IGNORE INTO retailers (code, name, base_url, sitemap_url, is_active) VALU
 """
 
 
+_ML_MODELS_DDL = """
+CREATE TABLE IF NOT EXISTS ml_models (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(64)  NOT NULL,
+    payload     LONGBLOB     NULL,
+    n_samples   INT          NOT NULL DEFAULT 0,
+    metrics     JSON         NULL,
+    trained_at  DATETIME     NULL,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_ml_model_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+
 def ensure_schema_upgrades(engine: Engine) -> None:
     """Applique les upgrades manquants (MySQL uniquement)."""
     if engine.dialect.name != "mysql":
@@ -138,6 +153,7 @@ def ensure_schema_upgrades(engine: Engine) -> None:
         db_name = conn.execute(text("SELECT DATABASE()")).scalar()
         conn.execute(text(_TRACKED_SETS_DDL))
         conn.execute(text(_JOB_RUNS_DDL))
+        conn.execute(text(_ML_MODELS_DDL))
         # PokéStock FR — tables additives + seed détaillants.
         conn.execute(text(_RETAILERS_DDL))
         conn.execute(text(_RETAIL_OFFERS_DDL))

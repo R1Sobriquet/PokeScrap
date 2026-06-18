@@ -420,6 +420,19 @@ CREATE TABLE releases (
     KEY idx_release_date (release_date)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- --------------------------- Future Radar : ml_models ---------------
+CREATE TABLE ml_models (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    name        VARCHAR(64)  NOT NULL,
+    payload     LONGBLOB     NULL,
+    n_samples   INT          NOT NULL DEFAULT 0,
+    metrics     JSON         NULL,
+    trained_at  DATETIME     NULL,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_ml_model_name (name)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================================
 --  SEED — Paliers
 -- =====================================================================

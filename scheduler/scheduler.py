@@ -141,6 +141,16 @@ def refresh_history() -> None:
     logger.info("refresh_history: mode Pro — TODO ingestion history")
 
 
+def train_release_model() -> None:
+    # Future Radar : (ré)entraîne le modèle de scoring (no-op si données insuffisantes).
+    from app.ml.scorer import train
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = train(db)
+    logger.info("train_release_model: %s", result.get("summary"))
+
+
 def main() -> None:
     scheduler = BlockingScheduler(timezone=TIMEZONE)
     scheduler.add_job(heartbeat, "interval", minutes=1, id="heartbeat")
@@ -180,6 +190,12 @@ def main() -> None:
         retail_detect_new_skus,
         CronTrigger(hour="7,19", minute=15, timezone=TIMEZONE),
         id="retail_detect_new_skus",
+    )
+    # Future Radar — ré-entraînement hebdo du modèle ML : dimanche 03:30.
+    scheduler.add_job(
+        train_release_model,
+        CronTrigger(day_of_week="sun", hour=3, minute=30, timezone=TIMEZONE),
+        id="train_release_model",
     )
     logger.info(
         "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly, deadman=30m).",

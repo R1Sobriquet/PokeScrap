@@ -70,7 +70,9 @@ export default function FutureRadar() {
       <div className="text-center">
         <div className="inline-flex items-center gap-2 rounded-full px-3 py-1.5" style={{ border: "1px solid rgba(155,123,255,.35)", background: "rgba(155,123,255,.1)" }}>
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--violet)", animation: "pa-pulse 2s infinite" }} />
-          <span className="font-mono text-[10.5px] tracking-[0.16em]" style={{ color: "var(--violet-text)" }}>{t("future.badge")}</span>
+          <span className="font-mono text-[10.5px] tracking-[0.16em]" style={{ color: "var(--violet-text)" }}>
+            {list.some((r) => r.scores?.model === "ml-v1") ? t("future.badge.ml") : t("future.badge")}
+          </span>
         </div>
         <h1 className="mt-4 text-[40px] font-extrabold tracking-tight">{t("future.title")}</h1>
         <p className="mx-auto mt-3 max-w-[560px] text-[15.5px] leading-relaxed text-slate-500">{t("future.subtitle")}</p>
@@ -88,6 +90,7 @@ export default function FutureRadar() {
             const conf = sc.confidence ?? hashScore(rel.product_name, "conf", 48, 95);
             const pop = sc.popularity ?? hashScore(rel.product_name, "pop", 45, 96);
             const roi = sc.roi ?? hashScore(rel.product_name, "roi", 40, 220);
+            const isMl = sc.model === "ml-v1";
             const heuristic = sc.heuristic === true;
             return (
               <div key={rel.id ?? i} className="overflow-hidden rounded-2xl p-6 transition-transform hover:-translate-y-1" style={panel}>
@@ -108,7 +111,7 @@ export default function FutureRadar() {
                   <Metric label={t("future.metric.pop")} value={pop} color="var(--violet-text)" barPct={pop} barColor="#9B7BFF" />
                   <div>
                     <div className="font-mono text-[9.5px] tracking-[0.11em] text-slate-500">{t("future.metric.roi")}</div>
-                    <div className="font-mono text-[21px] font-bold leading-none" style={{ color: "var(--gold)", marginTop: 2 }}>+{roi}%</div>
+                    <div className="font-mono text-[21px] font-bold leading-none" style={{ color: "var(--gold)", marginTop: 2 }}>{roi >= 0 ? "+" : ""}{roi}%</div>
                   </div>
                 </div>
 
@@ -118,7 +121,7 @@ export default function FutureRadar() {
                   </div>
                 )}
                 <div className="mt-3 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-600">
-                  {heuristic ? t("future.heuristic") : t("future.provisional")}
+                  {isMl ? t("future.ml") : heuristic ? t("future.heuristic") : t("future.provisional")}
                 </div>
               </div>
             );
