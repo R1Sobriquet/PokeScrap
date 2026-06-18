@@ -8,6 +8,7 @@ from app.models import Alert, RetailOffer, RetailStockEvent, Retailer
 from app.retail import politeness
 from app.services.retail_jobs import (
     _utcnow,
+    run_backfill_images,
     run_check_restocks,
     run_detect_new_skus,
 )
@@ -19,6 +20,9 @@ PRODUCT_HTML = {
                 '"availability":"https://schema.org/InStock"}}</script>',
     "out": '<script type="application/ld+json">{"@type":"Product","name":"ETB Pokémon",'
            '"offers":{"@type":"Offer","price":"59.99","availability":"OutOfStock"}}</script>',
+    "with_image": '<script type="application/ld+json">{"@type":"Product","name":"ETB Pokémon",'
+                  '"image":"https://img/etb.jpg",'
+                  '"offers":{"@type":"Offer","price":"59.99","availability":"InStock"}}</script>',
 }
 
 
@@ -124,3 +128,31 @@ def test_detect_new_skus_inserts_offers(db_session):
     assert res["new_offers"] == 2  # le /aide/ est filtré
     urls = set(db_session.scalars(select(RetailOffer.url)).all())
     assert "https://c/p/coffret-pokemon-1.html" in urls
+
+
+def test_backfill_images_fills_missing(db_session):
+    _enable(db_session)  # sourcing on, dry-run off (sans effet ici : pas d'alerte)
+    _seed_offer(db_session, state="in_stock")  # offer sans image_url
+    res = run_backfill_images(db_session, http_get=_fake_get("with_image"))
+    assert res["images"] == 1
+    offer = db_session.scalar(select(RetailOffer))
+    assert offer.image_url == "https://img/etb.jpg"
+
+
+def test_backfill_skips_offers_that_already_have_image(db_session):
+    _enable(db_session)
+    r = Retailer(code="cultura", name="Cultura", is_active=1)
+    db_session.add(r)
+    db_session.flush()
+    db_session.add(RetailOffer(retailer_id=r.id, url="https://c/p/x.html",
+                               title="X", current_stock_state="in_stock",
+                               image_url="https://img/exists.jpg"))
+    db_session.commit()
+    res = run_backfill_images(db_session, http_get=_fake_get("with_image"))
+    assert res["scanned"] == 0 and res["images"] == 0
+
+
+def test_backfill_noop_when_sourcing_disabled(db_session):
+    _seed_offer(db_session, state="in_stock")
+    res = run_backfill_images(db_session, http_get=_fake_get("with_image"))
+    assert "désactivé" in res["summary"]

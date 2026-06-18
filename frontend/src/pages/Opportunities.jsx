@@ -2,6 +2,7 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { Card, Table, Badge, PageHeader, eur, pct } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 const FLAG_LABELS = { anti_pump: "Anti-pump", illiquid: "Illiquidité", fomo: "FOMO" };
 
@@ -27,7 +28,10 @@ export default function Opportunities() {
 
   const cols = [
     { key: "raw_title", label: "Annonce", render: (r) => (
-        <a href={r.url} target="_blank" rel="noreferrer" className="text-info hover:underline">{r.raw_title}</a>
+        <div className="flex items-center gap-2.5">
+          <ProductImage src={r.image_url} alt={r.raw_title} seed={r.url || r.raw_title} style={{ width: 30, height: 42 }} />
+          <a href={r.url} target="_blank" rel="noreferrer" className="text-info hover:underline">{r.raw_title}</a>
+        </div>
       ) },
     { key: "platform", label: "Plateforme" },
     { key: "acquisition_cost_total", label: "Coût", render: (r) => eur(r.acquisition_cost_total) },

@@ -215,6 +215,73 @@ def run_refresh_prices(db: Session, *, http_get: HttpGet | None = None) -> dict:
     return _scan_watched(db, alert=False, http_get=http_get)
 
 
+def run_backfill_images(db: Session, *, http_get: HttpGet | None = None) -> dict:
+    """Backfill ponctuel : récupère l'image des offres sans ``image_url``.
+
+    Réutilise la politesse complète (cap requêtes/run, délai+jitter, circuit
+    breaker). Aucune alerte : insensible au dry-run, mais gardé par
+    ``retail_sourcing_enabled`` + flag par détaillant (comme tout fetch).
+    """
+    if _sourcing_off():
+        return {"summary": "sourcing désactivé (retail_sourcing_enabled=false)"}
+
+    cap = int(get_setting("retail_request_cap_per_run", default=40))
+    min_delay = int(get_setting("retail_min_delay_ms", default=3000))
+    max_err = int(get_setting("retail_circuit_max_errors", default=5))
+    cooldown_cap = int(get_setting("scrape_blocked_cooldown_min", default=120))
+
+    budget = politeness.RequestBudget(cap)
+    now = _utcnow()
+    stats = {"scanned": 0, "images": 0, "blocked": 0, "skipped": 0}
+
+    for retailer in _active_retailers(db):
+        if politeness.circuit_open(db, retailer.code, now, max_err):
+            stats["blocked"] += 1
+            continue
+        source = HttpRetailSource(_to_dc(retailer), http_get=http_get or httpx_get)
+        offers = db.scalars(
+            select(RetailOffer).where(
+                RetailOffer.retailer_id == retailer.id, RetailOffer.image_url.is_(None)
+            )
+        ).all()
+        for offer in offers:
+            if not budget.allow():
+                logger.info("retail backfill: plafond de requêtes atteint (%s).", cap)
+                break
+            try:
+                snap = source.fetch_offer(offer.url)
+            except RetailBlocked as exc:
+                mins = politeness.record_retailer_error(
+                    db, retailer.code, now, cooldown_cap_min=cooldown_cap
+                )
+                logger.warning("retail backfill: %s bloqué (%s) — backoff %s min.",
+                               retailer.code, exc.reason, mins)
+                stats["blocked"] += 1
+                break
+            except Exception:  # noqa: BLE001 - une page KO ne casse pas le run
+                logger.exception("retail backfill: échec fetch %s", offer.url)
+                stats["skipped"] += 1
+                continue
+
+            politeness.clear_retailer_errors(db, retailer.code)
+            stats["scanned"] += 1
+            if snap.image:
+                offer.image_url = snap.image[:512]
+                if snap.title and not offer.title:
+                    offer.title = snap.title[:255]
+                offer.last_checked_at = now
+                stats["images"] += 1
+            db.commit()
+            delay = politeness.jittered_delay_s(min_delay)
+            if delay:
+                time.sleep(delay)
+
+    stats["summary"] = (
+        f"{stats['scanned']} vérifiées / {stats['images']} images / {stats['blocked']} bloqués"
+    )
+    return stats
+
+
 def _list_skus_cached(db: Session, retailer: Retailer, http_get: HttpGet,
                       budget: politeness.RequestBudget) -> tuple[list, bool]:
     """Lit le sitemap (conditionnel ETag/Last-Modified) → (skus produits, modifié?)."""

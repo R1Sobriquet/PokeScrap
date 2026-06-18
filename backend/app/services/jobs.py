@@ -18,7 +18,12 @@ from app.models import JobRun
 from app.services.ingestion import ingest_watchlist_prices
 from app.services.kpi_snapshot import run_kpi_snapshot
 from app.services.movers import compute_top_movers
-from app.services.retail_jobs import run_check_restocks, run_detect_new_skus, run_refresh_prices
+from app.services.retail_jobs import (
+    run_backfill_images,
+    run_check_restocks,
+    run_detect_new_skus,
+    run_refresh_prices,
+)
 from app.services.runtime_settings import ensure_runtime_settings
 from app.services.selling_service import evaluate_position_sales
 from app.services.tracked_sets import ensure_default_tracked_sets, sync_tracked_sets
@@ -74,6 +79,7 @@ JOBS = {
     "retail-check-restocks": run_check_restocks,
     "retail-detect-new-skus": run_detect_new_skus,
     "retail-refresh-prices": run_refresh_prices,
+    "retail-backfill-images": run_backfill_images,
 }
 
 

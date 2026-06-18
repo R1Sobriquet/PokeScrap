@@ -43,6 +43,7 @@ def compute_top_movers(db: Session, *, set_slug: str | None = None, limit: int |
         rows.append({
             "product_id": product.id,
             "name": product.name,
+            "image_url": product.image_url,
             "set_slug": product.set_slug,
             "rise_pct": round(rise * 100, 2) if rise is not None else None,
             "volume": snap.sale_count,

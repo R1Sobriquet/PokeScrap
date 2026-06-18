@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Card, Table, Badge, PageHeader, eur, pct } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 const EMPTY = { name: "", set_slug: "", min_value_eur: "5", include_single: true, include_sealed: true };
 
@@ -70,7 +71,12 @@ export default function Sets() {
   ];
 
   const moverCols = [
-    { key: "name", label: "Produit" },
+    { key: "name", label: "Produit", render: (m) => (
+        <div className="flex items-center gap-2.5">
+          <ProductImage src={m.image_url} alt={m.name} seed={m.set_slug} style={{ width: 30, height: 42 }} />
+          <span className="font-medium">{m.name}</span>
+        </div>
+      ) },
     { key: "set_slug", label: "Set", render: (m) => <span className="text-xs text-slate-500">{m.set_slug}</span> },
     { key: "rise_pct", label: "Hausse 7j/30j", render: (m) => (
         <span className={m.rise_pct >= 0 ? "text-info" : "text-critical"}>{pct(m.rise_pct)}</span>
