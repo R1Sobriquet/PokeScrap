@@ -5,6 +5,7 @@ import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Card, Table, Badge, PageHeader, eur } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 function Sparkline({ latest }) {
   if (!latest) return <span className="text-slate-600">—</span>;
@@ -73,7 +74,13 @@ export default function Watchlist() {
   }
 
   const cols = [
-    { key: "name", label: "Produit", render: (r) => r.product?.name },
+    { key: "name", label: "Produit", render: (r) => (
+        <div className="flex items-center gap-2.5">
+          <ProductImage src={r.product?.image_url} alt={r.product?.name} seed={r.product?.set_slug}
+                        style={{ width: 32, height: 44 }} />
+          <span className="font-medium">{r.product?.name}</span>
+        </div>
+      ) },
     { key: "tier", label: "Tier", render: (r) =>
         editing === r.product_id ? (
           <input className="w-16 rounded bg-slate-800 px-1" defaultValue={r.tier}

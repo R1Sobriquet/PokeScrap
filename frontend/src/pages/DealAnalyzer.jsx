@@ -3,6 +3,7 @@ import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { eur } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 const TONE = {
   buy: { color: "var(--green-text)", bg: "rgba(52,211,153,.08)", border: "rgba(52,211,153,.4)", glow: "rgba(52,211,153,.25)", icon: "▲" },
@@ -96,6 +97,8 @@ export default function DealAnalyzer() {
         <div className="overflow-hidden rounded-2xl" style={{ border: "1px solid var(--border2)", background: "var(--panel-solid)", boxShadow: "0 24px 70px var(--shadow)" }}>
           <div className="flex items-center justify-between gap-3 border-b px-6 py-4" style={{ borderColor: "var(--line)" }}>
             <div className="flex min-w-0 items-center gap-3">
+              <ProductImage src={deal.image || deal.market_image} alt={deal.product} seed={deal.source}
+                            style={{ width: 40, height: 54 }} />
               <span className="flex-none rounded-md font-mono text-[10px] tracking-[0.12em]" style={{ padding: "4px 10px", color: "var(--blue-soft)", background: "rgba(61,123,255,.12)", border: "1px solid rgba(61,123,255,.3)" }}>
                 {deal.source}
               </span>

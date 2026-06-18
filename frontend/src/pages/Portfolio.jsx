@@ -1,6 +1,7 @@
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { eur } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
@@ -74,10 +75,15 @@ export default function Portfolio() {
             const pnlUpR = (r.latent_pnl ?? 0) >= 0;
             return (
               <div key={r.id ?? i} className="overflow-hidden rounded-2xl" style={{ ...panel, borderColor: "var(--border2)" }}>
-                <div className="flex items-center justify-between gap-2 border-b px-4 py-3" style={{ borderColor: "var(--line)", background: "var(--panel2)" }}>
-                  <div className="truncate text-[13px] font-bold leading-tight">{r.product_name}</div>
-                  <div className="flex-none rounded-md font-mono text-[9px] font-bold tracking-wide" style={{ padding: "4px 7px", color: "var(--bg)", background: "var(--text)" }}>
-                    {t("portfolio.qty")} {r.quantity}
+                <div className="relative">
+                  <ProductImage src={r.image_url} alt={r.product_name} seed={r.product_id}
+                                rounded={0} showInitials={false} style={{ width: "100%", height: 120 }} />
+                  <div className="absolute inset-x-0 bottom-0 flex items-center justify-between gap-2 px-4 py-2.5"
+                       style={{ background: "linear-gradient(transparent, rgba(6,6,14,.82) 45%)" }}>
+                    <div className="truncate text-[13px] font-bold leading-tight text-white">{r.product_name}</div>
+                    <div className="flex-none rounded-md font-mono text-[9px] font-bold tracking-wide" style={{ padding: "4px 7px", color: "#10131A", background: "rgba(255,255,255,.92)" }}>
+                      {t("portfolio.qty")} {r.quantity}
+                    </div>
                   </div>
                 </div>
                 <div className="grid grid-cols-3 gap-2 px-4 py-3.5">

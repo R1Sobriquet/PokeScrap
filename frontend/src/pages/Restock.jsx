@@ -4,6 +4,7 @@ import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { eur } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
@@ -143,15 +144,19 @@ export default function Restock() {
                 className="grid items-center gap-2.5 border-b px-4 py-3.5"
                 style={{ borderColor: "var(--line)", gridTemplateColumns: "minmax(0,1fr) 92px 130px 80px 100px 70px" }}
               >
-                <div className="min-w-0">
-                  <div className="truncate text-sm font-semibold">{o.title || o.url}</div>
-                  <div className="mt-0.5 flex items-center gap-2">
-                    <a href={o.url} target="_blank" rel="noreferrer" className="font-mono text-[10px]" style={{ color: "var(--blue-soft)" }}>
-                      {host(o.url)}
-                    </a>
-                    <button onClick={() => unwatch(o)} className="border-none bg-transparent p-0 font-mono text-[10px] text-slate-600 hover:text-critical">
-                      {t("restock.remove")}
-                    </button>
+                <div className="flex min-w-0 items-center gap-2.5">
+                  <ProductImage src={o.image_url} alt={o.title || o.url} seed={o.retailer}
+                                style={{ width: 34, height: 46 }} />
+                  <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">{o.title || o.url}</div>
+                    <div className="mt-0.5 flex items-center gap-2">
+                      <a href={o.url} target="_blank" rel="noreferrer" className="font-mono text-[10px]" style={{ color: "var(--blue-soft)" }}>
+                        {host(o.url)}
+                      </a>
+                      <button onClick={() => unwatch(o)} className="border-none bg-transparent p-0 font-mono text-[10px] text-slate-600 hover:text-critical">
+                        {t("restock.remove")}
+                      </button>
+                    </div>
                   </div>
                 </div>
                 <div className="font-mono text-[11.5px] text-slate-400">{o.retailer}</div>

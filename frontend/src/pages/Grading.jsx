@@ -1,6 +1,7 @@
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { Card, Table, Badge, PageHeader, eur } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 export default function Grading() {
   const { t } = useI18n();
@@ -29,7 +30,12 @@ export default function Grading() {
   }
 
   const cols = [
-    { key: "product_name", label: "Produit" },
+    { key: "product_name", label: "Produit", render: (r) => (
+        <div className="flex items-center gap-2.5">
+          <ProductImage src={r.image_url} alt={r.product_name} seed={r.product_id} style={{ width: 30, height: 42 }} />
+          <span className="font-medium">{r.product_name}</span>
+        </div>
+      ) },
     { key: "raw_value", label: "Valeur brute", render: (r) => eur(r.raw_value) },
     { key: "expected_net_weighted", label: "Espérance pondérée", render: (r) => eur(r.expected_net_weighted) },
     { key: "grading_cost", label: "Coût", render: (r) => eur(r.grading_cost) },
