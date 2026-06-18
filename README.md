@@ -97,14 +97,24 @@ docker compose exec backend python -m app.cli  # ou via le panel « Actions & Jo
    en base) et passer le setting `telegram_enabled=true`. Idem côté Discord :
    `DISCORD_CHANNEL_RESTOCK`.
 
-### TODO — Indice de scalping (hors périmètre MVP, non implémenté)
+### Deal Analyzer (indice de scalping — v1)
 
-Prévu plus tard : croiser le **prix marché PokeTrace** (table `products` /
-`price_snapshots`) avec le **prix officiel détaillant** (`retail_offers.current_price`)
-pour repérer les écarts de scalping. Le point d'extension est déjà en place :
-`retail_offers.product_id` (FK nullable vers `products`, `ON DELETE SET NULL`).
-**Aucun code de scalping ni de fuzzy-matching automatique n'est livré** — le lien
-offre↔produit reste manuel/best-effort.
+Première brique du croisement **prix annoncé vs prix marché PokeTrace** :
+`POST /retail/analyze` (`app/services/deal_analyzer.py`) récupère une annonce par
+URL (parser JSON-LD/DOM réutilisé), recherche la carte/produit sur PokeTrace
+(`card_value` : UNOPENED scellé / NEAR_MINT single), convertit en EUR
+(`fx_usd_eur`) et calcule l'écart + un verdict (`STRONG BUY` … `OVERPRICED`).
+Écran dashboard **Deal Analyzer** (`/analyzer`). Une seule requête sortante par
+analyse (action manuelle). Le matching offre↔produit interne
+(`retail_offers.product_id`, FK nullable) reste manuel/best-effort ; pas de
+fuzzy-matching automatique persistant.
+
+### Frontend PokéAlpha (reskin)
+
+Le dashboard adopte le design **PokéAlpha** : 4 thèmes runtime (dark/light/holo/
+ember), polices Outfit + JetBrains Mono, sélecteur de thème et **bascule de langue
+FR/EN** (`src/i18n.jsx`, `src/ThemeContext.jsx`), landing publique (`/`), et écran
+**Future Radar** (`/future`, scores provisoires en attendant un modèle prédictif).
 
 ## Sourcing & auto-watchlist
 
