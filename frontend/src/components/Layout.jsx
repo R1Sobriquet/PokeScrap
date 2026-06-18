@@ -3,7 +3,100 @@ import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext.jsx";
 import { useTheme, THEMES } from "../ThemeContext.jsx";
 import { useI18n, LANGS } from "../i18n.jsx";
+import { usePolling } from "../hooks/usePolling.js";
 import PackModal from "./PackModal.jsx";
+
+const SEV_DOT = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--green)" };
+
+function AlertsMenu() {
+  const { t } = useI18n();
+  const [open, setOpen] = useState(false);
+  const { data } = usePolling("/alerts?status=pending", { intervalSec: 30 });
+  const alerts = data || [];
+  return (
+    <div className="relative flex-none">
+      <button
+        onClick={() => setOpen((v) => !v)}
+        className="flex items-center gap-1.5 rounded-xl px-2.5 py-2"
+        style={{ border: "1px solid rgba(244,88,95,.3)", background: "rgba(244,88,95,.08)" }}
+      >
+        <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)", animation: "pa-pulse 2s infinite" }} />
+        <span className="font-mono text-[11px]" style={{ color: "var(--red-text)" }}>
+          {alerts.length} {t("chrome.alerts")}
+        </span>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-50 mt-2.5 w-[340px] overflow-hidden rounded-2xl"
+               style={{ background: "var(--panel-solid)", border: "1px solid var(--border2)", boxShadow: "0 24px 60px var(--shadow)" }}>
+            <div className="border-b px-4 py-3 font-mono text-[10px] tracking-[0.14em] text-slate-500" style={{ borderColor: "var(--line)" }}>
+              {t("chrome.notifications")}
+            </div>
+            {alerts.length === 0 ? (
+              <div className="px-4 py-6 text-center text-sm text-slate-500">{t("chrome.alerts.none")}</div>
+            ) : (
+              alerts.slice(0, 8).map((a) => (
+                <div key={a.id} className="flex items-start gap-3 border-b px-4 py-3" style={{ borderColor: "var(--line)" }}>
+                  <span className="mt-1.5 flex-none" style={{ width: 8, height: 8, borderRadius: "50%", background: SEV_DOT[a.severity] || "var(--green)" }} />
+                  <div className="min-w-0 flex-1">
+                    <div className="flex justify-between gap-2">
+                      <span className="font-mono text-[9.5px] tracking-[0.12em] text-slate-500">{a.alert_type}</span>
+                      <span className="font-mono text-[9.5px] text-slate-600">{(a.created_at || "").replace("T", " ").slice(5, 16)}</span>
+                    </div>
+                    <div className="mt-1 text-[13px] leading-snug text-slate-300">{a.title}</div>
+                  </div>
+                </div>
+              ))
+            )}
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
+
+function PlanMenu({ username, onSignOut }) {
+  const { t } = useI18n();
+  const navigate = useNavigate();
+  const [open, setOpen] = useState(false);
+  const { data } = usePolling("/settings", { intervalSec: 300 });
+  const plan = (data || []).find((s) => s.key === "poketrace_plan")?.value || "free";
+  const initials = (username || "PA").slice(0, 2).toUpperCase();
+  return (
+    <div className="relative flex-none">
+      <button onClick={() => setOpen((v) => !v)} className="flex items-center gap-2.5 rounded-xl px-2 py-1.5"
+              style={{ border: "1px solid transparent" }}>
+        <div className="flex h-8 w-8 items-center justify-center rounded-full text-[12px] font-bold text-white"
+             style={{ background: "linear-gradient(150deg, #3D7BFF, #9B7BFF)", boxShadow: "0 0 0 2px var(--bg), 0 0 0 4px var(--logo-accent)" }}>
+          {initials}
+        </div>
+        <div className="hidden text-left lg:block">
+          <div className="text-[13px] font-semibold leading-tight">{username || "—"}</div>
+          <div className="font-mono text-[10px] tracking-[0.08em]" style={{ color: plan === "pro" ? "var(--violet-text)" : "var(--muted)" }}>
+            {plan.toUpperCase()} {t("chrome.plan")} ▾
+          </div>
+        </div>
+      </button>
+      {open && (
+        <>
+          <div className="fixed inset-0 z-40" onClick={() => setOpen(false)} />
+          <div className="absolute right-0 z-50 mt-2.5 w-56 overflow-hidden rounded-2xl"
+               style={{ background: "var(--panel-solid)", border: "1px solid var(--border2)", boxShadow: "0 24px 60px var(--shadow)" }}>
+            <button onClick={() => { setOpen(false); navigate("/reglages"); }}
+                    className="block w-full border-b px-4 py-3 text-left text-sm hover:bg-slate-800/40"
+                    style={{ borderColor: "var(--line)", color: "var(--blue-soft)" }}>
+              {t("chrome.viewSettings")}
+            </button>
+            <button onClick={onSignOut} className="block w-full px-4 py-3 text-left text-sm text-slate-300 hover:bg-slate-800/40">
+              {t("chrome.signOut")}
+            </button>
+          </div>
+        </>
+      )}
+    </div>
+  );
+}
 
 // Navigation regroupée par domaine ; les libellés passent par i18n (FR/EN).
 const NAV_GROUPS = [
@@ -128,7 +221,6 @@ export default function Layout() {
   const { t } = useI18n();
   const navigate = useNavigate();
   const [packOpen, setPackOpen] = useState(false);
-  const initials = (username || "PA").slice(0, 2).toUpperCase();
 
   return (
     <div className="flex min-h-screen flex-col">
@@ -152,28 +244,8 @@ export default function Layout() {
         </button>
         <ThemeSwitcher />
         <LangSwitcher />
-        <div
-          className="hidden items-center gap-2.5 rounded-xl px-2.5 py-1.5 sm:flex"
-          style={{ border: "1px solid var(--border2)", background: "var(--panel2)" }}
-        >
-          <div
-            className="flex h-7 w-7 items-center justify-center rounded-full text-[11px] font-bold text-white"
-            style={{ background: "linear-gradient(150deg, #3D7BFF, #9B7BFF)" }}
-          >
-            {initials}
-          </div>
-          <div className="text-[13px] font-semibold leading-none">{username || "—"}</div>
-        </div>
-        <button
-          onClick={() => {
-            signOut();
-            navigate("/login");
-          }}
-          className="rounded-xl px-3 py-2 text-[13px] font-semibold transition-colors"
-          style={{ border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text2)" }}
-        >
-          {t("chrome.signOut")}
-        </button>
+        <AlertsMenu />
+        <PlanMenu username={username} onSignOut={() => { signOut(); navigate("/login"); }} />
       </header>
 
       <div className="flex flex-1">

@@ -1,6 +1,8 @@
+import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { useTheme, THEMES } from "../ThemeContext.jsx";
 import { useI18n } from "../i18n.jsx";
+import PackModal from "../components/PackModal.jsx";
 
 // Données marketing statiques (vitrine) reprises du design.
 const TICKER = [
@@ -144,10 +146,12 @@ export default function Landing() {
   const navigate = useNavigate();
   const { theme, setTheme } = useTheme();
   const { t } = useI18n();
+  const [packOpen, setPackOpen] = useState(false);
   const launch = () => navigate("/cockpit");
 
   return (
     <div style={{ minHeight: "100vh", overflow: "hidden" }}>
+      <PackModal open={packOpen} onClose={() => setPackOpen(false)} />
       {/* Hero */}
       <div style={{ position: "relative", minHeight: "100vh", display: "flex", flexDirection: "column" }}>
         <div style={{ position: "absolute", inset: 0, background: "var(--hero-overlay)", pointerEvents: "none" }} />
@@ -204,6 +208,13 @@ export default function Landing() {
               style={{ padding: "16px 30px", borderRadius: 14, border: "none", background: "linear-gradient(180deg, #FFD75A, #FFC91F)", fontSize: 16.5, fontWeight: 700, cursor: "pointer", boxShadow: "0 10px 34px rgba(255,203,46,.35)" }}
             >
               {t("landing.cta.explore")}
+            </button>
+            <button
+              onClick={() => setPackOpen(true)}
+              className="inline-flex items-center gap-2"
+              style={{ padding: "16px 26px", borderRadius: 14, border: "1px solid var(--glass-border)", background: "var(--glass-bg)", color: "var(--text)", fontSize: 16.5, fontWeight: 600, cursor: "pointer", backdropFilter: "blur(10px)" }}
+            >
+              <span style={{ filter: "drop-shadow(0 0 6px rgba(255,203,46,.6))" }}>⚡</span> {t("pack.cta")}
             </button>
           </div>
 
