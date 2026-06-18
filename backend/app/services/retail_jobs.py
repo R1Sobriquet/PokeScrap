@@ -200,6 +200,8 @@ def _apply_snapshot(offer: RetailOffer, snap, now: dt.datetime) -> bool:
         offer.currency = snap.currency
     if snap.title and not offer.title:
         offer.title = snap.title[:255]
+    if snap.image and not offer.image_url:
+        offer.image_url = snap.image[:512]
     offer.last_checked_at = now
     return changed
 

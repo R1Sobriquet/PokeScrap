@@ -30,6 +30,7 @@ def _product_dict(p: Product) -> dict:
         "poketrace_id": p.poketrace_id,
         "cardmarket_id": p.cardmarket_id,
         "tcgplayer_id": p.tcgplayer_id,
+        "image_url": p.image_url,
         "is_active": bool(p.is_active),
     }
 

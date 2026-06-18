@@ -57,6 +57,20 @@ def _host(url: str) -> str:
     return (urlparse(url).hostname or "").replace("www.", "") or "—"
 
 
+def _card_image(card: dict) -> str | None:
+    """URL d'image d'une carte PokeTrace (``image`` objet/str ou ``imageUrl``)."""
+    img = card.get("image")
+    if isinstance(img, dict):
+        for k in ("large", "small", "url"):
+            v = img.get(k)
+            if isinstance(v, str) and v:
+                return v
+    elif isinstance(img, str) and img:
+        return img
+    alt = card.get("imageUrl")
+    return alt if isinstance(alt, str) and alt else None
+
+
 def analyze_listing(
     db: Session,
     url: str,
@@ -88,6 +102,7 @@ def analyze_listing(
         "status": "ok",
         "source": host,
         "product": snap.title or url,
+        "image": snap.image,
         "listed_price": listed,
         "currency": snap.currency or "EUR",
         "stock_state": snap.stock_state,
@@ -115,6 +130,7 @@ def analyze_listing(
             logger.warning("Deal analyzer PokeTrace KO: %s", exc)
 
     result["matched_name"] = (matched or {}).get("name") if matched else None
+    result["market_image"] = _card_image(matched) if matched else None
     result["market_value_eur"] = market_eur
 
     # (3) Verdict.

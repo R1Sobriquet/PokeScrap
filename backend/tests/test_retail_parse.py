@@ -30,6 +30,28 @@ def test_jsonld_in_stock_priority():
     assert o.retailer_sku == "ETB-1"
 
 
+def test_jsonld_image_extracted():
+    html = """<script type="application/ld+json">
+    {"@type":"Product","name":"ETB","image":["https://img/etb.jpg","https://img/2.jpg"],
+     "offers":{"@type":"Offer","price":"49.99","availability":"InStock"}}</script>"""
+    assert parse_offer(html, "http://x/p").image == "https://img/etb.jpg"
+
+
+def test_jsonld_image_object():
+    html = """<script type="application/ld+json">
+    {"@type":"Product","name":"ETB","image":{"@type":"ImageObject","url":"https://img/o.jpg"},
+     "offers":{"price":"10","availability":"InStock"}}</script>"""
+    assert parse_offer(html, "http://x/p").image == "https://img/o.jpg"
+
+
+def test_dom_og_image_fallback():
+    html = '<html><head><meta property="og:image" content="https://img/og.jpg">' \
+           '<meta itemprop="price" content="12.00"></head><body>disponible</body></html>'
+    o = parse_offer(html, "http://x/b")
+    assert o.source == "dom"
+    assert o.image == "https://img/og.jpg"
+
+
 def test_jsonld_graph_out_of_stock():
     o = parse_jsonld_offer(JSONLD_GRAPH_OOS, "http://x/d")
     assert o is not None and o.stock_state == OUT_OF_STOCK and o.price == Decimal("129.9")

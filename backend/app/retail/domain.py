@@ -77,6 +77,7 @@ class OfferSnapshot:
     price: Decimal | None = None
     currency: str = "EUR"
     title: str | None = None
+    image: str | None = None
     retailer_sku: str | None = None
     product_type: str | None = None
     fetched_at: dt.datetime | None = None

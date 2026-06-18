@@ -374,6 +374,7 @@ CREATE TABLE retail_offers (
     retailer_sku        VARCHAR(128) NULL,
     url                 VARCHAR(512) NOT NULL,
     title               VARCHAR(255) NULL,
+    image_url           VARCHAR(512) NULL,
     product_type        VARCHAR(16)  NOT NULL DEFAULT 'autre',
     current_stock_state ENUM('in_stock','out_of_stock','preorder','unknown') NOT NULL DEFAULT 'unknown',
     current_price       DECIMAL(8,2) NULL,

@@ -366,7 +366,7 @@ def update_retailer(retailer_id: int, payload: RetailerUpdate, db: Session = Dep
 def _offer_dict(o: RetailOffer, retailer_name: str | None = None) -> dict:
     return {
         "id": o.id, "retailer_id": o.retailer_id, "retailer": retailer_name,
-        "url": o.url, "title": o.title, "product_type": o.product_type,
+        "url": o.url, "title": o.title, "image_url": o.image_url, "product_type": o.product_type,
         "stock_state": o.current_stock_state,
         "price": float(o.current_price) if o.current_price is not None else None,
         "currency": o.currency, "is_watched": bool(o.is_watched),
@@ -454,6 +454,8 @@ def add_offer(payload: OfferAddIn, db: Session = Depends(get_db)) -> dict:
             offer.current_price = snap.price
         if snap.title:
             offer.title = snap.title[:255]
+        if snap.image:
+            offer.image_url = snap.image[:512]
         offer.last_checked_at = _utcnow()
         if snap.stock_state in ("in_stock", "preorder", "out_of_stock"):
             db.add(RetailStockEvent(offer_id=offer.id, from_state="unknown",

@@ -72,6 +72,21 @@ def _iter_jsonld(soup: BeautifulSoup):
         yield from _flatten(data)
 
 
+def _first_image(value) -> str | None:
+    """Extrait une URL d'image depuis ``image`` JSON-LD (str | list | ImageObject)."""
+    if isinstance(value, str):
+        return value or None
+    if isinstance(value, dict):
+        u = value.get("url") or value.get("contentUrl")
+        return u if isinstance(u, str) and u else None
+    if isinstance(value, list):
+        for item in value:
+            u = _first_image(item)
+            if u:
+                return u
+    return None
+
+
 def _is_product(node: dict) -> bool:
     t = node.get("@type")
     if isinstance(t, list):
@@ -113,6 +128,7 @@ def parse_jsonld_offer(html: str, url: str) -> OfferSnapshot | None:
             price=price,
             currency=str(currency)[:3] or "EUR",
             title=node.get("name"),
+            image=_first_image(node.get("image")),
             retailer_sku=str(sku) if sku else None,
             source="jsonld",
         )
@@ -153,8 +169,16 @@ def parse_dom_offer(html: str, url: str) -> OfferSnapshot:
     elif soup.title and soup.title.string:
         title = soup.title.string.strip()
 
+    image = None
+    ogimg = soup.find("meta", attrs={"property": "og:image"}) or soup.find(
+        "meta", attrs={"name": "og:image"}
+    )
+    if ogimg and ogimg.get("content"):
+        image = ogimg["content"]
+
     return OfferSnapshot(
-        url=url, stock_state=state, price=price, currency=currency, title=title, source="dom"
+        url=url, stock_state=state, price=price, currency=currency, title=title,
+        image=image, source="dom",
     )
 
 

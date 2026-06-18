@@ -27,6 +27,7 @@ class RetailOffer(Base):
     retailer_sku: Mapped[str | None] = mapped_column(String(128), nullable=True)
     url: Mapped[str] = mapped_column(String(512), unique=True, nullable=False)
     title: Mapped[str | None] = mapped_column(String(255), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     product_type: Mapped[str] = mapped_column(String(16), nullable=False, default="autre")
     current_stock_state: Mapped[str] = mapped_column(String(16), nullable=False, default="unknown")
     current_price: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)

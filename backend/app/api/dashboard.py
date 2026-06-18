@@ -160,6 +160,7 @@ def positions(db: Session = Depends(get_db)) -> list[dict]:
             "id": pos.id,
             "product_id": pos.product_id,
             "product_name": product.name,
+            "image_url": product.image_url,
             "quantity": pos.quantity,
             "avg_cost": avg_cost,
             "market_value_unit": round(mv_unit, 2) if mv_unit is not None else None,
@@ -285,6 +286,7 @@ def grading_opportunities(db: Session = Depends(get_db)) -> list[dict]:
     return [
         {
             "id": o.id, "product_id": o.product_id, "product_name": p.name,
+            "image_url": p.image_url,
             "raw_value": _f(o.raw_value), "expected_net_weighted": _f(o.expected_net_weighted),
             "grading_cost": _f(o.grading_cost), "grade_probability": o.grade_probability,
             "is_recommended": bool(o.is_recommended),

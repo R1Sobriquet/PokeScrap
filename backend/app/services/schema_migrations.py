@@ -72,6 +72,7 @@ CREATE TABLE IF NOT EXISTS retail_offers (
     retailer_sku        VARCHAR(128) NULL,
     url                 VARCHAR(512) NOT NULL,
     title               VARCHAR(255) NULL,
+    image_url           VARCHAR(512) NULL,
     product_type        VARCHAR(16)  NOT NULL DEFAULT 'autre',
     current_stock_state ENUM('in_stock','out_of_stock','preorder','unknown') NOT NULL DEFAULT 'unknown',
     current_price       DECIMAL(8,2) NULL,
@@ -174,3 +175,17 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                 "'lot_summary','tech_error','restock','new_sku') NOT NULL"
             ))
             logger.info("Migration : valeurs ENUM alerts.alert_type restock/new_sku ajoutées.")
+
+        # PokéAlpha — image produit sur les offres retail (JSON-LD/og:image).
+        img_col = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                "WHERE table_schema = :db AND table_name = 'retail_offers' AND column_name = 'image_url'"
+            ),
+            {"db": db_name},
+        ).scalar()
+        if not img_col:
+            conn.execute(text(
+                "ALTER TABLE retail_offers ADD COLUMN image_url VARCHAR(512) NULL AFTER title"
+            ))
+            logger.info("Migration : colonne retail_offers.image_url ajoutée.")
