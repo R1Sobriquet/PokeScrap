@@ -11,6 +11,7 @@ const NAV_GROUPS = [
       { to: "/cockpit", key: "nav.cockpit" },
       { to: "/opportunites", key: "nav.opportunites" },
       { to: "/sets", key: "nav.sets" },
+      { to: "/future", key: "nav.future" },
       { to: "/watchlist", key: "nav.watchlist" },
       { to: "/restock", key: "nav.restock" },
       { to: "/detaillants", key: "nav.detaillants" },

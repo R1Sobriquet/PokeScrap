@@ -259,7 +259,7 @@ export default function Landing() {
             desc={t("landing.feature.future.desc")}
             link={t("landing.feature.future.link")}
             accent="var(--violet-text)"
-            onClick={() => navigate("/calendrier")}
+            onClick={() => navigate("/future")}
           />
           <FeatureCard
             kicker={t("landing.feature.analyzer.kicker")}
