@@ -46,6 +46,21 @@ def _text(node) -> str | None:
     return node.get_text(strip=True) if node else None
 
 
+def _image(card, sel: dict, base_url: str) -> str | None:
+    """URL d'image de la vignette d'annonce (tolère le lazy-loading data-src)."""
+    node = card.select_one(sel["image"]) if sel.get("image") else card.find("img")
+    if node is None:
+        return None
+    src = node.get("src") or node.get("data-src") or node.get("data-original")
+    if not src:
+        srcset = node.get("srcset") or node.get("data-srcset")
+        if srcset:
+            src = srcset.split(",")[0].strip().split(" ")[0]
+    if not src or src.startswith("data:"):
+        return None
+    return urljoin(base_url, src)
+
+
 def _external_id(card, sel: dict, href: str | None) -> str | None:
     attr = sel.get("external_id_attr")
     if attr and card.has_attr(attr):
@@ -87,6 +102,7 @@ def parse_listings(
 
         shipping = parse_price(_text(card.select_one(sel["shipping"]))) if sel.get("shipping") else None
         location = _text(card.select_one(sel["location"])) if sel.get("location") else None
+        image = _image(card, sel, base_url)
 
         listings.append(
             RawListing(
@@ -97,6 +113,7 @@ def parse_listings(
                 asking_price=price,
                 shipping_cost=shipping or 0.0,
                 location=location,
+                image_url=image,
             )
         )
 

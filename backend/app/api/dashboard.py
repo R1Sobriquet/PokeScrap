@@ -227,7 +227,7 @@ def opportunities(
                 None if l.passes_50_rule is None else bool(l.passes_50_rule)
             ),
             "status": l.status, "filter_flags": l.filter_flags,
-            "location": l.location,
+            "location": l.location, "image_url": l.image_url,
             "detected_at": l.detected_at.isoformat() if l.detected_at else None,
         }
         for l in db.scalars(stmt).all()

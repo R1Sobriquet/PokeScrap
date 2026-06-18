@@ -161,6 +161,7 @@ CREATE TABLE sourcing_listings (
     acquisition_cost_total DECIMAL(12,2) AS (asking_price + shipping_cost + protection_cost) STORED,
     currency               CHAR(3)      NOT NULL DEFAULT 'EUR',
     location               VARCHAR(128) NULL,
+    image_url              VARCHAR(768) NULL,
     estimated_resale_value DECIMAL(12,2) NULL,
     ratio_pct              DECIMAL(6,2) NULL,
     passes_50_rule         TINYINT(1)   NULL,

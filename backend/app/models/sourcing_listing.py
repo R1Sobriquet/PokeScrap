@@ -30,6 +30,7 @@ class SourcingListing(Base):
     )
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
     location: Mapped[str | None] = mapped_column(String(128), nullable=True)
+    image_url: Mapped[str | None] = mapped_column(String(768), nullable=True)
     estimated_resale_value: Mapped[Decimal | None] = mapped_column(Numeric(12, 2), nullable=True)
     ratio_pct: Mapped[Decimal | None] = mapped_column(Numeric(6, 2), nullable=True)
     passes_50_rule: Mapped[int | None] = mapped_column(SmallInteger, nullable=True)

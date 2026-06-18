@@ -189,3 +189,17 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                 "ALTER TABLE retail_offers ADD COLUMN image_url VARCHAR(512) NULL AFTER title"
             ))
             logger.info("Migration : colonne retail_offers.image_url ajoutée.")
+
+        # PokéAlpha — image de vignette sur les annonces de sourcing (scraper).
+        src_img = conn.execute(
+            text(
+                "SELECT COUNT(*) FROM information_schema.columns "
+                "WHERE table_schema = :db AND table_name = 'sourcing_listings' AND column_name = 'image_url'"
+            ),
+            {"db": db_name},
+        ).scalar()
+        if not src_img:
+            conn.execute(text(
+                "ALTER TABLE sourcing_listings ADD COLUMN image_url VARCHAR(768) NULL AFTER location"
+            ))
+            logger.info("Migration : colonne sourcing_listings.image_url ajoutée.")
