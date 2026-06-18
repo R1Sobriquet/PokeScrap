@@ -31,7 +31,7 @@ export default function Retailers() {
       ) },
     { key: "is_active", label: "Actif", render: (r) => (
         <button onClick={() => toggle(r)}
-          className={`rounded px-3 py-1 text-xs ${r.is_active ? "bg-info text-slate-900" : "bg-slate-700 text-slate-300"}`}>
+          className={`rounded px-3 py-1 text-xs ${r.is_active ? "bg-info text-ink" : "bg-slate-700 text-slate-300"}`}>
           {r.is_active ? "ON" : "off"}
         </button>
       ) },

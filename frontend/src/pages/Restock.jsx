@@ -70,7 +70,7 @@ export default function Restock() {
             value={url}
             onChange={(e) => setUrl(e.target.value)}
           />
-          <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">
+          <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">
             Ajouter à la veille
           </button>
         </form>

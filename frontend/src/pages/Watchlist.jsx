@@ -110,7 +110,7 @@ export default function Watchlist() {
 
       <Card title="Watchlist"
             right={<button onClick={() => setShowAdd((v) => !v)}
-              className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">+ Ajouter une carte/produit</button>}>
+              className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">+ Ajouter une carte/produit</button>}>
         {showAdd && (
           <form onSubmit={addCard} className="mb-4 grid gap-2 rounded border border-slate-800 p-3 md:grid-cols-3">
             <label className="text-xs md:col-span-3">Recherche PokeTrace (requis)
@@ -150,7 +150,7 @@ export default function Watchlist() {
             {addMsg && <p className="text-xs text-critical md:col-span-3">{addMsg}</p>}
             <div className="md:col-span-3">
               <button type="submit" disabled={adding}
-                      className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900 disabled:opacity-60">
+                      className="rounded bg-info px-3 py-1 text-sm font-medium text-ink disabled:opacity-60">
                 {adding ? "Recherche…" : "Ajouter"}
               </button>
             </div>

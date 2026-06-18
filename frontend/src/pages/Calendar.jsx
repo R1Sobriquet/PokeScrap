@@ -70,7 +70,7 @@ export default function Calendar() {
           </label>
           {err && <p className="text-xs text-critical md:col-span-3">{err}</p>}
           <div className="md:col-span-3">
-            <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">Ajouter</button>
+            <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">Ajouter</button>
           </div>
         </form>
       </Card>

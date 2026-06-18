@@ -76,7 +76,7 @@ export default function Settings() {
             Plan actuel : <b>{byKey["poketrace_plan"]?.value || "?"}</b> · marché{" "}
             <b>{byKey["valuation_market"]?.value || "?"}</b>
           </p>
-          <button onClick={switchPro} className="rounded bg-info px-3 py-2 text-sm font-medium text-slate-900">
+          <button onClick={switchPro} className="rounded bg-info px-3 py-2 text-sm font-medium text-ink">
             Passer en Pro
           </button>
           <p className="mt-2 text-xs text-slate-500">Atomique, confirmé ; effectif au prochain run de job.</p>

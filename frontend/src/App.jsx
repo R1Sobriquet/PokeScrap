@@ -1,5 +1,7 @@
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
 import { AuthProvider } from "./AuthContext.jsx";
+import { ThemeProvider } from "./ThemeContext.jsx";
+import { I18nProvider } from "./i18n.jsx";
 import ProtectedRoute from "./ProtectedRoute.jsx";
 import Layout from "./components/Layout.jsx";
 import Login from "./pages/Login.jsx";
@@ -19,8 +21,10 @@ import Settings from "./pages/Settings.jsx";
 
 export default function App() {
   return (
-    <AuthProvider>
-      <BrowserRouter>
+    <ThemeProvider>
+      <I18nProvider>
+        <AuthProvider>
+          <BrowserRouter>
         <Routes>
           <Route path="/login" element={<Login />} />
           <Route
@@ -46,7 +50,9 @@ export default function App() {
           </Route>
           <Route path="*" element={<Navigate to="/cockpit" replace />} />
         </Routes>
-      </BrowserRouter>
-    </AuthProvider>
+          </BrowserRouter>
+        </AuthProvider>
+      </I18nProvider>
+    </ThemeProvider>
   );
 }

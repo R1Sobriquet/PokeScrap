@@ -58,7 +58,7 @@ export default function Sets() {
       ) },
     { key: "is_active", label: "Actif", render: (s) => (
         <button onClick={() => toggle(s)}
-          className={`rounded px-3 py-1 text-xs ${s.is_active ? "bg-info text-slate-900" : "bg-slate-700 text-slate-300"}`}>
+          className={`rounded px-3 py-1 text-xs ${s.is_active ? "bg-info text-ink" : "bg-slate-700 text-slate-300"}`}>
           {s.is_active ? "ON" : "off"}
         </button>
       ) },
@@ -84,7 +84,7 @@ export default function Sets() {
 
       <Card title="Sets cibles (auto-watchlist)"
             right={<button onClick={() => setShowForm((v) => !v)}
-              className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">+ Ajouter un set cible</button>}>
+              className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">+ Ajouter un set cible</button>}>
         {showForm && (
           <form onSubmit={submit} className="mb-4 grid gap-2 rounded border border-slate-800 p-3 md:grid-cols-2">
             <label className="text-xs">Nom
@@ -103,7 +103,7 @@ export default function Sets() {
             </div>
             {err && <p className="text-xs text-critical md:col-span-2">{err}</p>}
             <div className="md:col-span-2">
-              <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">Ajouter</button>
+              <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">Ajouter</button>
             </div>
           </form>
         )}

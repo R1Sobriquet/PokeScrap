@@ -66,7 +66,7 @@ export default function Jobs() {
                   disabled={running}
                   className={`rounded px-3 py-2 text-sm font-medium ${
                     running ? "cursor-not-allowed bg-slate-700 text-slate-400"
-                            : "bg-info text-slate-900 hover:opacity-90"}`}
+                            : "bg-info text-ink hover:opacity-90"}`}
                 >
                   {running ? "En cours…" : "Lancer"}
                 </button>
