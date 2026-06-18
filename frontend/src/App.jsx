@@ -20,6 +20,8 @@ import Retailers from "./pages/Retailers.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import FutureRadar from "./pages/FutureRadar.jsx";
 import DealAnalyzer from "./pages/DealAnalyzer.jsx";
+import SetExplorer from "./pages/SetExplorer.jsx";
+import SetDetail from "./pages/SetDetail.jsx";
 import Settings from "./pages/Settings.jsx";
 
 export default function App() {
@@ -43,6 +45,8 @@ export default function App() {
             <Route path="/portefeuille" element={<Portfolio />} />
             <Route path="/watchlist" element={<Watchlist />} />
             <Route path="/sets" element={<Sets />} />
+            <Route path="/explorer" element={<SetExplorer />} />
+            <Route path="/set/:slug" element={<SetDetail />} />
             <Route path="/lots" element={<Lots />} />
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/grading" element={<Grading />} />

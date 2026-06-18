@@ -1,7 +1,9 @@
+import { useNavigate } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { eur, pct } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
@@ -45,9 +47,21 @@ function MonoRow({ label, value, muted }) {
   );
 }
 
+function SectionLabel({ children, right }) {
+  return (
+    <div className="flex items-baseline justify-between">
+      <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-500">{children}</div>
+      {right}
+    </div>
+  );
+}
+
 export default function Cockpit() {
   const { data, loading } = usePolling("/cockpit");
+  const { data: movers } = usePolling("/movers");
+  const { data: sets } = usePolling("/tracked-sets", { intervalSec: 120 });
   const { t } = useI18n();
+  const navigate = useNavigate();
   if (loading || !data) return <p className="text-slate-400">{t("common.loading")}</p>;
   const k = data.kpis;
   const tier = data.tier;
@@ -176,6 +190,70 @@ export default function Cockpit() {
             <div className="text-sm text-slate-400">{t("cockpit.alloc.empty")}</div>
           )}
         </div>
+      </div>
+
+      {/* Top opportunités (movers réels, avec images) */}
+      <div>
+        <SectionLabel right={<button onClick={() => navigate("/sets")} className="text-[12.5px]" style={{ color: "var(--blue-soft)" }}>{t("cockpit.viewall")}</button>}>
+          {t("cockpit.section.opportunities")}
+        </SectionLabel>
+        {(movers || []).length === 0 ? (
+          <div className="mt-3 rounded-2xl p-6 text-center text-sm text-slate-500" style={panel}>{t("cockpit.opps.empty")}</div>
+        ) : (
+          <div className="mt-3 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
+            {(movers || []).slice(0, 4).map((m) => {
+              const up = (m.rise_pct ?? 0) >= 0;
+              return (
+                <button key={m.product_id} onClick={() => navigate(`/set/${m.set_slug || ""}`)}
+                        className="overflow-hidden rounded-2xl text-left transition-transform hover:-translate-y-1" style={{ ...panel }}>
+                  <ProductImage src={m.image_url} alt={m.name} seed={m.set_slug} rounded={0} showInitials={false} style={{ width: "100%", height: 120 }} />
+                  <div className="p-3.5">
+                    <div className="truncate text-[14px] font-bold">{m.name}</div>
+                    <div className="mt-0.5 font-mono text-[9.5px] uppercase tracking-[0.12em] text-slate-500">{m.set_slug || "—"}</div>
+                    <div className="mt-3 flex items-center justify-between border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
+                      <span className="font-mono text-[14px] font-semibold">{eur(m.price)}</span>
+                      <span className="rounded-md font-mono text-[11px]" style={{ padding: "2px 7px", color: up ? "var(--green-text)" : "var(--red-text)", background: up ? "rgba(52,211,153,.1)" : "rgba(244,88,95,.1)" }}>
+                        {up ? "▲" : "▼"} {pct(m.rise_pct)}
+                      </span>
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+
+      {/* Sets en vogue (sets suivis) */}
+      <div>
+        <SectionLabel right={<button onClick={() => navigate("/explorer")} className="text-[12.5px]" style={{ color: "var(--blue-soft)" }}>{t("cockpit.viewall")}</button>}>
+          {t("cockpit.section.trending")}
+        </SectionLabel>
+        {(sets || []).length === 0 ? (
+          <div className="mt-3 rounded-2xl p-6 text-center text-sm text-slate-500" style={panel}>{t("cockpit.trending.empty")}</div>
+        ) : (
+          <div className="mt-3 flex gap-3.5 overflow-x-auto pb-2">
+            {(sets || []).slice(0, 8).map((s) => {
+              const setMovers = (movers || []).filter((m) => m.set_slug === s.set_slug);
+              return (
+                <button key={s.id} onClick={() => navigate(`/set/${s.set_slug}`)}
+                        className="w-[210px] flex-none overflow-hidden rounded-2xl text-left transition-transform hover:-translate-y-1" style={{ ...panel }}>
+                  <ProductImage alt={s.name} seed={s.set_slug} rounded={0} style={{ width: "100%", height: 96 }} />
+                  <div className="p-3.5">
+                    <div className="truncate text-[15px] font-bold">{s.name}</div>
+                    <div className="mt-1 font-mono text-[9.5px] uppercase tracking-[0.12em] text-slate-500">{s.set_slug}</div>
+                    <div className="mt-3 flex items-center justify-between border-t pt-2.5" style={{ borderColor: "var(--line)" }}>
+                      <span className="font-mono text-[12px] text-slate-300">{setMovers.length} {t("explorer.movers")}</span>
+                      {s.is_active
+                        ? <span className="rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "var(--green-text)", background: "rgba(52,211,153,.1)" }}>ON</span>
+                        : <span className="rounded-full px-2 py-0.5 text-[11px] text-slate-500" style={{ background: "var(--panel2)" }}>off</span>}
+                    </div>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </div>
 
       {/* Historique */}

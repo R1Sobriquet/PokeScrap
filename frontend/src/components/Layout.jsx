@@ -106,6 +106,7 @@ const NAV_GROUPS = [
       { to: "/cockpit", key: "nav.cockpit" },
       { to: "/opportunites", key: "nav.opportunites" },
       { to: "/sets", key: "nav.sets" },
+      { to: "/explorer", key: "nav.explorer" },
       { to: "/future", key: "nav.future" },
       { to: "/analyzer", key: "nav.analyzer" },
       { to: "/watchlist", key: "nav.watchlist" },

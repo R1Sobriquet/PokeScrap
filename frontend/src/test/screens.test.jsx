@@ -19,6 +19,7 @@ vi.mock("../api.js", () => ({
   fetchMe: vi.fn(),
 }));
 
+import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../AuthContext.jsx";
 import Cockpit from "../pages/Cockpit.jsx";
 import Settings from "../pages/Settings.jsx";
@@ -28,9 +29,10 @@ import Watchlist from "../pages/Watchlist.jsx";
 import Restock from "../pages/Restock.jsx";
 import Retailers from "../pages/Retailers.jsx";
 import Calendar from "../pages/Calendar.jsx";
+import SetExplorer from "../pages/SetExplorer.jsx";
 import App from "../App.jsx";
 
-const wrap = (ui) => render(<AuthProvider>{ui}</AuthProvider>);
+const wrap = (ui) => render(<MemoryRouter><AuthProvider>{ui}</AuthProvider></MemoryRouter>);
 
 beforeEach(() => {
   h.post.mockClear();
@@ -189,6 +191,21 @@ describe("PokéStock FR — Calendrier", () => {
     fireEvent.click(screen.getByText("Ajouter"));
     await waitFor(() => expect(h.post).toHaveBeenCalled());
     expect(h.post.mock.calls[0][1]).toBe("/releases");
+  });
+});
+
+describe("Set Explorer", () => {
+  it("affiche les sets suivis avec le nombre de movers", () => {
+    h.polled["/tracked-sets"] = [
+      { id: 1, name: "Prismatic Evolutions", set_slug: "prismatic-evolutions", is_active: true },
+    ];
+    h.polled["/movers"] = [
+      { product_id: 9, name: "Umbreon ex", set_slug: "prismatic-evolutions", rise_pct: 12.5, price: 1400 },
+    ];
+    wrap(<SetExplorer />);
+    expect(screen.getByText("Prismatic Evolutions")).toBeInTheDocument();
+    expect(screen.getByText("prismatic-evolutions")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument(); // 1 mover
   });
 });
 
