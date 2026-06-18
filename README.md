@@ -133,6 +133,48 @@ Parité train/serve garantie (mêmes features). Upgradeable vers des modèles pl
 riches sans changer l'interface (`scores` : `{hype, confidence, popularity, roi,
 model}`).
 
+### Moat de données marché + automatisation auto-supervisée
+
+On **possède son historique** : chaque jour on tire les prix scellés courants
+multi-sources et on les stocke en `market_price_snapshots` (un snapshot par
+`(product_ref, source, market, jour)` → idempotent). En quelques mois : série
+longitudinale propriétaire qui nourrit le modèle Future Radar.
+
+**Sources** (port unique `app/marketdata/`, interchangeables, OFF par défaut) :
+- **PokemonPriceTracker** (`ppt`) — prix scellés USD (TCGplayer) + EUR
+  (Cardmarket). Quota free 100 req/j → **watched-only** + cap/run (90<100). Clé :
+  `settings ppt_api_key` ou `.env PPT_API_KEY`.
+- **TCGdex** (`tcgdex`) — catalogue canonique FR + dates de sortie (gratuit, sans
+  clé). Sert au matching et à l'auto-calendrier.
+- **eBay Browse** (`ebay`) — annonces FR (OAuth) ; **agrégats dérivés uniquement**
+  (nb/min/médiane) pour respecter la rétention eBay. `ebay_client_id/secret`.
+
+**Tables** : `market_price_snapshots` (le moat), `data_quarantine` (prix rejetés
+par les garde-fous), `match_review` (matchs ambigus, basse priorité).
+
+**Jobs** (panel + scheduler, verrou `job_runs`) : `market-snapshot-daily`,
+`calendar-sync` (auto-remplit `releases`), `match-products` (offre↔produit :
+set+numéro → fuzzy, ≥ seuil auto, sinon `match_review` — rien ne bloque),
+`source-health-check`.
+
+**Automatisation auto-supervisée** — agressif sur le planning, léger sur les
+requêtes :
+- **Garde-fous d'ingestion** : bornes de sanité par `product_type`, cohérence
+  devise/marché, dédup, outlier vs médiane → rejet en `data_quarantine`.
+- **Footprint poli** : cap/run honorant les quotas, jitter, circuit breaker +
+  backoff sur 403/429 (réutilise `app/retail/politeness`).
+- **Hygiène d'alertes** : cooldown + **anti-flapping** (oscillation in/out ne
+  spamme pas) ; **digest quotidien** optionnel (`alert_digest_enabled`) pour les
+  events non urgents (nouveaux SKU, quarantaine, review).
+- **Moniteur santé** (`source-health-check`, le seul moment où tu interviens) :
+  pour chaque source, fraîcheur / erreurs / blocage / volume nul → alerte sur le
+  **canal santé** (`DISCORD_CHANNEL_HEALTH` + Telegram). Les sources OK = silence.
+
+**Settings clés** : `marketdata_enabled`, `marketdata_<source>_enabled`,
+`marketdata_request_cap_per_run_<source>`, `match_confidence_threshold`,
+`sanity_bounds_eur`, `alert_digest_enabled`, `source_health_*`. Rollback :
+`db/migrations/down_marketdata_moat.sql`.
+
 ## Sourcing & auto-watchlist
 
 - **Scraping auto désactivé par défaut** (`sourcing_scraping_enabled=false`) :
