@@ -73,8 +73,21 @@ describe("Settings — bascule Pro", () => {
 
 describe("Auth", () => {
   it("protège les routes : non connecté → écran de login", () => {
+    // "/" est la landing publique ; une route protégée redirige vers le login.
+    window.history.pushState({}, "", "/cockpit");
     render(<App />);
     expect(screen.getByText("Se connecter")).toBeInTheDocument();
+    window.history.pushState({}, "", "/");
+  });
+});
+
+describe("Landing", () => {
+  it("affiche la landing publique sur /", () => {
+    window.history.pushState({}, "", "/");
+    render(<App />);
+    // Langue par défaut FR.
+    expect(screen.getByText("Lancer l'app")).toBeInTheDocument();
+    expect(screen.getByText("Explorer le marché")).toBeInTheDocument();
   });
 });
 

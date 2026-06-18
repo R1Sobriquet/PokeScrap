@@ -4,6 +4,7 @@ import { ThemeProvider } from "./ThemeContext.jsx";
 import { I18nProvider } from "./i18n.jsx";
 import ProtectedRoute from "./ProtectedRoute.jsx";
 import Layout from "./components/Layout.jsx";
+import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
 import Cockpit from "./pages/Cockpit.jsx";
 import Opportunities from "./pages/Opportunities.jsx";
@@ -26,6 +27,7 @@ export default function App() {
         <AuthProvider>
           <BrowserRouter>
         <Routes>
+          <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
           <Route
             element={
