@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { NavLink, Outlet, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext.jsx";
 import { useTheme, THEMES } from "../ThemeContext.jsx";
 import { useI18n, LANGS } from "../i18n.jsx";
+import PackModal from "./PackModal.jsx";
 
 // Navigation regroupée par domaine ; les libellés passent par i18n (FR/EN).
 const NAV_GROUPS = [
@@ -125,10 +127,12 @@ export default function Layout() {
   const { username, signOut } = useAuth();
   const { t } = useI18n();
   const navigate = useNavigate();
+  const [packOpen, setPackOpen] = useState(false);
   const initials = (username || "PA").slice(0, 2).toUpperCase();
 
   return (
     <div className="flex min-h-screen flex-col">
+      <PackModal open={packOpen} onClose={() => setPackOpen(false)} />
       {/* Header chrome PokéAlpha */}
       <header
         className="sticky top-0 z-50 flex h-[58px] items-center gap-3 px-5 backdrop-blur-xl"
@@ -139,6 +143,13 @@ export default function Layout() {
       >
         <Logo />
         <div className="flex-1" />
+        <button
+          onClick={() => setPackOpen(true)}
+          className="hidden rounded-xl px-3 py-2 text-[13px] font-bold transition-shadow sm:block"
+          style={{ border: "1px solid rgba(155,123,255,.45)", background: "rgba(155,123,255,.1)", color: "var(--violet-text)" }}
+        >
+          ✦ {t("pack.cta")}
+        </button>
         <ThemeSwitcher />
         <LangSwitcher />
         <div

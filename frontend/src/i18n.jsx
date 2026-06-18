@@ -186,6 +186,11 @@ const DICT = {
     "analyzer.note.warn": "Au-dessus du marché — prudence.",
     "analyzer.note.pass": "Bien au-dessus du marché — passe.",
     "analyzer.note.nocomp": "Aucun comparable marché trouvé.",
+    "pack.cta": "Ouvrir un booster",
+    "pack.clickToRip": "CLIQUE POUR OUVRIR",
+    "pack.simulated": "BOOSTER SIMULÉ",
+    "pack.again": "Rouvrir",
+    "pack.done": "Terminé",
   },
   en: {
     "app.name": "PokéAlpha",
@@ -362,6 +367,11 @@ const DICT = {
     "analyzer.note.warn": "Above market — caution.",
     "analyzer.note.pass": "Well above market — pass.",
     "analyzer.note.nocomp": "No market comp found.",
+    "pack.cta": "Rip a Pack",
+    "pack.clickToRip": "CLICK TO RIP",
+    "pack.simulated": "SIMULATED BOOSTER",
+    "pack.again": "Rip another",
+    "pack.done": "Done",
   },
 };
 
