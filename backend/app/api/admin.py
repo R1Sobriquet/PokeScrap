@@ -488,12 +488,15 @@ def analyze_deal(payload: AnalyzeIn, db: Session = Depends(get_db)) -> dict:
 
 # --------------------------------------------------------------- releases (calendrier)
 def _release_dict(r: Release) -> dict:
+    from app.services.release_scoring import score_release
+
     return {
         "id": r.id, "set_name": r.set_name, "product_name": r.product_name,
         "product_type": r.product_type,
         "release_date": r.release_date.isoformat() if r.release_date else None,
         "preorder_date": r.preorder_date.isoformat() if r.preorder_date else None,
         "source_note": r.source_note,
+        "scores": score_release(r),
     }
 
 

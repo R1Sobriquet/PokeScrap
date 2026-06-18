@@ -83,10 +83,12 @@ export default function FutureRadar() {
           {list.map((rel, i) => {
             const status = statusOf(rel, now);
             const ss = STATUS_STYLE[status];
-            const hype = hashScore(rel.product_name, "hype", 52, 97);
-            const conf = hashScore(rel.product_name, "conf", 48, 95);
-            const pop = hashScore(rel.product_name, "pop", 45, 96);
-            const roi = hashScore(rel.product_name, "roi", 40, 220);
+            const sc = rel.scores || {};
+            const hype = sc.hype ?? hashScore(rel.product_name, "hype", 52, 97);
+            const conf = sc.confidence ?? hashScore(rel.product_name, "conf", 48, 95);
+            const pop = sc.popularity ?? hashScore(rel.product_name, "pop", 45, 96);
+            const roi = sc.roi ?? hashScore(rel.product_name, "roi", 40, 220);
+            const heuristic = sc.heuristic === true;
             return (
               <div key={rel.id ?? i} className="overflow-hidden rounded-2xl p-6 transition-transform hover:-translate-y-1" style={panel}>
                 <div className="flex items-center justify-between">
@@ -115,7 +117,9 @@ export default function FutureRadar() {
                     {rel.source_note}
                   </div>
                 )}
-                <div className="mt-3 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-600">{t("future.provisional")}</div>
+                <div className="mt-3 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-600">
+                  {heuristic ? t("future.heuristic") : t("future.provisional")}
+                </div>
               </div>
             );
           })}
