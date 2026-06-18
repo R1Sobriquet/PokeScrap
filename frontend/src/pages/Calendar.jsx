@@ -2,12 +2,14 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, PageHeader } from "../components/ui.jsx";
 
 const EMPTY = { product_name: "", set_name: "", product_type: "", release_date: "", preorder_date: "", source_note: "" };
 
 export default function Calendar() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data: releases, reload } = usePolling("/releases", { intervalSec: 120 });
   const [form, setForm] = useState(EMPTY);
   const [err, setErr] = useState(null);
@@ -46,7 +48,7 @@ export default function Calendar() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Calendrier des sorties</h1>
+      <PageHeader title={t("nav.calendrier")} subtitle={t("calendar.subtitle")} />
 
       <Card title="Ajouter une sortie (curation manuelle)">
         <form onSubmit={submit} className="grid gap-2 md:grid-cols-3">

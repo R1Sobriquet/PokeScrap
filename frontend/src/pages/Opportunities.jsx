@@ -1,10 +1,12 @@
 import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
-import { Card, Table, Badge, eur, pct } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader, eur, pct } from "../components/ui.jsx";
 
 const FLAG_LABELS = { anti_pump: "Anti-pump", illiquid: "Illiquidité", fomo: "FOMO" };
 
 export default function Opportunities() {
+  const { t } = useI18n();
   const [tab, setTab] = useState("active");
   const { data } = usePolling("/opportunities");
   const rows = data || [];
@@ -40,7 +42,7 @@ export default function Opportunities() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Opportunités</h1>
+      <PageHeader title={t("nav.opportunites")} subtitle={t("opportunities.subtitle")} />
       <div className="flex gap-2">
         <Tab active={tab === "active"} onClick={() => setTab("active")}>Actives ({active.length})</Tab>
         <Tab active={tab === "blocked"} onClick={() => setTab("blocked")}>Bloquées ({blocked.length})</Tab>

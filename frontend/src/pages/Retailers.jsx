@@ -1,10 +1,12 @@
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table, Badge } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader } from "../components/ui.jsx";
 
 export default function Retailers() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data: retailers, reload } = usePolling("/retail/retailers", { intervalSec: 30 });
 
   async function toggle(r) {
@@ -44,7 +46,7 @@ export default function Retailers() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Détaillants</h1>
+      <PageHeader title={t("nav.detaillants")} subtitle={t("retailers.subtitle")} />
       <Card title="Cibles de veille (Cultura · Fnac · Micromania)">
         <Table columns={cols} rows={retailers || []} empty="Aucun détaillant" />
         <p className="mt-2 text-xs text-slate-500">

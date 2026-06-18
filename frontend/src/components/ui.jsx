@@ -2,6 +2,32 @@
 // design PokéAlpha. Le palette Tailwind (slate/info/warning/critical) est adossé
 // aux variables de thème, donc ces primitives basculent sur les 4 thèmes.
 
+// En-tête de page « terminal » : gros titre + sous-titre mono, pastille et slot
+// d'action optionnels. Standardise le haut de chaque écran.
+export function PageHeader({ title, subtitle, badge, right }) {
+  return (
+    <div className="flex flex-wrap items-end justify-between gap-4">
+      <div>
+        {badge && (
+          <div
+            className="mb-2.5 inline-flex items-center gap-2 rounded-full px-3 py-1 font-mono text-[9.5px] uppercase tracking-[0.14em] text-slate-500"
+            style={{ border: "1px solid var(--border2)", background: "var(--panel2)" }}
+          >
+            {badge}
+          </div>
+        )}
+        <h1 className="text-[26px] font-extrabold tracking-tight">{title}</h1>
+        {subtitle && <p className="mt-1.5 max-w-[620px] text-sm text-slate-500">{subtitle}</p>}
+      </div>
+      {right}
+    </div>
+  );
+}
+
+// Classes/style partagés pour les champs de formulaire (look terminal).
+export const inputCls = "rounded-lg border px-2.5 py-1.5 text-sm text-slate-100 outline-none";
+export const inputStyle = { borderColor: "var(--border2)", background: "var(--panel2)" };
+
 export function Card({ title, children, right }) {
   return (
     <div className="rounded-2xl border border-slate-800 bg-slate-900 p-4 transition-colors">

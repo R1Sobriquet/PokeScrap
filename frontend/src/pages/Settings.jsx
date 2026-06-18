@@ -2,12 +2,14 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, PageHeader } from "../components/ui.jsx";
 
 const BREAKERS = ["fomo_freeze", "pe_reprint_ended", "pe_stock_declining", "speculation_flag"];
 
 export default function Settings() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data, reload } = usePolling("/settings", { intervalSec: 120 });
   const [drafts, setDrafts] = useState({});
   const settings = data || [];
@@ -45,7 +47,7 @@ export default function Settings() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Réglages</h1>
+      <PageHeader title={t("nav.reglages")} subtitle={t("settings.subtitle")} />
 
       <div className="grid gap-3 md:grid-cols-2">
         <Card title="Disjoncteurs">

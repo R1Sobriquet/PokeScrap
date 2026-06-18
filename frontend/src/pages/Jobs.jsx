@@ -2,7 +2,8 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Badge } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Badge, PageHeader } from "../components/ui.jsx";
 
 const JOB_LABELS = {
   "sync-tracked-sets": "Synchroniser les sets",
@@ -24,6 +25,7 @@ function sevFor(status) {
 
 export default function Jobs() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data, reload } = usePolling("/admin/jobs/recent", { intervalSec: 5 });
   const [msg, setMsg] = useState(null);
 
@@ -51,7 +53,7 @@ export default function Jobs() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Actions & Jobs</h1>
+      <PageHeader title={t("nav.jobs")} subtitle={t("jobs.subtitle")} />
       {msg && <div className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm">{msg}</div>}
 
       <div className="grid gap-3 md:grid-cols-2">

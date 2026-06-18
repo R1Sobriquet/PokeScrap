@@ -1,7 +1,9 @@
 import { usePolling } from "../hooks/usePolling.js";
-import { Card, Table, Badge, eur } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader, eur } from "../components/ui.jsx";
 
 export default function Grading() {
+  const { t } = useI18n();
   const { data: settings } = usePolling("/settings", { intervalSec: 120 });
   const { data: opps } = usePolling("/grading-opportunities");
 
@@ -11,7 +13,7 @@ export default function Grading() {
   if (!enabled) {
     return (
       <div className="space-y-4">
-        <h1 className="text-xl font-bold">Grading</h1>
+        <PageHeader title={t("nav.grading")} subtitle={t("grading.subtitle")} />
         <Card>
           <div className="py-8 text-center text-slate-500">
             <p className="text-lg">Module grading désactivé (mode prototype).</p>
@@ -43,7 +45,7 @@ export default function Grading() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Grading</h1>
+      <PageHeader title={t("nav.grading")} subtitle={t("grading.subtitle")} />
       <div className="rounded border border-warning/40 bg-warning/10 px-3 py-2 text-xs text-warning">
         Rappels : coût élevé (PSA ~80€ + logistique), capital immobilisé plusieurs mois, et le pop
         report surestime les hauts grades (biais de survie) — défaut conservateur. Plancher 100€.

@@ -3,7 +3,8 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table, Badge, eur } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader, eur } from "../components/ui.jsx";
 
 function Sparkline({ latest }) {
   if (!latest) return <span className="text-slate-600">—</span>;
@@ -32,6 +33,7 @@ const EMPTY_ADD = {
 
 export default function Watchlist() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data, reload } = usePolling("/watchlist");
   const { data: alerts } = usePolling("/alerts?status=pending", { intervalSec: 60 });
   const [editing, setEditing] = useState(null);
@@ -102,7 +104,7 @@ export default function Watchlist() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Watchlist</h1>
+      <PageHeader title={t("nav.watchlist")} subtitle={t("watchlist.subtitle")} />
       <div className={`rounded border px-3 py-2 text-sm ${peActive
         ? "border-info/40 bg-info/10 text-info" : "border-slate-800 bg-slate-900 text-slate-400"}`}>
         Signal d'accumulation Prismatic Evolutions : <b>{peActive ? "ACTIF" : "inactif"}</b>

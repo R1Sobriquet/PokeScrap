@@ -2,12 +2,14 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table, Badge, eur, pct } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader, eur, pct } from "../components/ui.jsx";
 
 const EMPTY = { name: "", set_slug: "", min_value_eur: "5", include_single: true, include_sealed: true };
 
 export default function Sets() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data: sets, reload } = usePolling("/tracked-sets", { intervalSec: 120 });
   const { data: movers } = usePolling("/movers");
   const [showForm, setShowForm] = useState(false);
@@ -80,7 +82,7 @@ export default function Sets() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Sets suivis & Top movers</h1>
+      <PageHeader title={t("nav.sets")} subtitle={t("sets.subtitle")} />
 
       <Card title="Sets cibles (auto-watchlist)"
             right={<button onClick={() => setShowForm((v) => !v)}

@@ -1,8 +1,10 @@
 import { usePolling } from "../hooks/usePolling.js";
 import { exportUrl } from "../api.js";
-import { Card, Table, Kpi, eur } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Kpi, PageHeader, eur } from "../components/ui.jsx";
 
 export default function Ledger() {
+  const { t } = useI18n();
   const { data: txs } = usePolling("/transactions");
   const { data: cockpit } = usePolling("/cockpit", { intervalSec: 60 });
   const k = cockpit?.kpis;
@@ -18,12 +20,15 @@ export default function Ledger() {
 
   return (
     <div className="space-y-4">
-      <div className="flex items-center justify-between">
-        <h1 className="text-xl font-bold">Ledger & Fiscalité</h1>
-        <a href={exportUrl("/ledger/export.csv")} className="rounded bg-slate-800 px-3 py-1 text-sm text-slate-200 hover:bg-slate-700">
-          Export CSV
-        </a>
-      </div>
+      <PageHeader
+        title={t("nav.ledger")}
+        subtitle={t("ledger.subtitle")}
+        right={
+          <a href={exportUrl("/ledger/export.csv")} className="rounded-lg px-3 py-2 text-sm text-slate-200 hover:bg-slate-800" style={{ border: "1px solid var(--border2)", background: "var(--panel2)" }}>
+            Export CSV
+          </a>
+        }
+      />
 
       {k && (
         <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
