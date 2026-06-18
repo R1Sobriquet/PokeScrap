@@ -64,30 +64,43 @@ def train(db: Session) -> dict:
 
     import numpy as np
     from sklearn.ensemble import GradientBoostingRegressor
+    from sklearn.model_selection import KFold, cross_val_score
     from sklearn.pipeline import make_pipeline
     from sklearn.preprocessing import StandardScaler
 
     Xa = np.asarray(X, dtype=float)
-    models, quantiles, metrics = {}, {}, {}
-    for tgt in TARGETS:
-        ya = np.asarray(y[tgt], dtype=float)
-        model = make_pipeline(
+    n_splits = max(2, min(5, n // 4))
+    kf = KFold(n_splits=n_splits, shuffle=True, random_state=0)
+
+    def _new_model():
+        return make_pipeline(
             StandardScaler(),
             GradientBoostingRegressor(random_state=0, n_estimators=150,
                                       max_depth=2, learning_rate=0.05, subsample=0.9),
         )
-        model.fit(Xa, ya)
+
+    models, quantiles, metrics = {}, {}, {}
+    for tgt in TARGETS:
+        ya = np.asarray(y[tgt], dtype=float)
+        # Métriques CROSS-VALIDÉES (held-out) — pas de R² in-sample optimiste.
+        cv_r2 = float(np.mean(cross_val_score(_new_model(), Xa, ya, cv=kf, scoring="r2")))
+        cv_mae = float(-np.mean(cross_val_score(_new_model(), Xa, ya, cv=kf,
+                                                scoring="neg_mean_absolute_error")))
+        model = _new_model()
+        model.fit(Xa, ya)  # modèle final sur tout le jeu
         models[tgt] = model
         quantiles[tgt] = (float(np.percentile(ya, 10)), float(np.percentile(ya, 90)))
-        metrics[tgt] = round(float(model.score(Xa, ya)), 3)  # R² in-sample (indicatif)
+        metrics[tgt] = {"cv_r2": round(cv_r2, 3), "cv_mae": round(cv_mae, 2)}
 
+    metrics["cv_folds"] = n_splits
     bundle = {"models": models, "feature_names": FEATURE_NAMES,
               "quantiles": quantiles, "n_samples": n}
     _persist(db, _dumps(bundle), n, metrics)
     invalidate()
-    logger.info("Modèle release_scorer entraîné (n=%s, R²=%s).", n, metrics)
+    logger.info("Modèle release_scorer entraîné (n=%s, CV=%s).", n, metrics)
+    summary = " ".join(f"{t} R²cv={metrics[t]['cv_r2']}" for t in TARGETS)
     return {"status": "trained", "n_samples": n, "metrics": metrics,
-            "summary": f"modèle entraîné (n={n}, R² {metrics})"}
+            "summary": f"modèle entraîné (n={n}, {n_splits}-fold CV · {summary})"}
 
 
 def run_train_release_model(db: Session) -> dict:

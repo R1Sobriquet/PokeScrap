@@ -96,6 +96,18 @@ export default function Jobs() {
                   {watchlistCount > QUOTA_WARN ? " — risque de dépassement, fractionne." : ""}
                 </p>
               )}
+              {name === "train-release-model" && data?.ml_model?.metrics && (
+                <div className="mt-2 font-mono text-[11px] text-slate-400">
+                  <div className="text-slate-500">CV (held-out) · n={data.ml_model.n_samples}</div>
+                  {["roi", "popularity", "hype"].map((tg) =>
+                    data.ml_model.metrics[tg] ? (
+                      <div key={tg}>
+                        {tg}: R²={data.ml_model.metrics[tg].cv_r2} · MAE={data.ml_model.metrics[tg].cv_mae}
+                      </div>
+                    ) : null
+                  )}
+                </div>
+              )}
             </Card>
           );
         })}

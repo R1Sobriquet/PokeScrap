@@ -10,17 +10,46 @@ Aucune cible fabriquée : un produit sans snapshot exploitable est ignoré.
 
 from __future__ import annotations
 
+import statistics
+
 from sqlalchemy import select
 from sqlalchemy.orm import Session
 
 from app.ml.features import extract_features
-from app.models import PriceSnapshot, Product
+from app.models import MarketPriceSnapshot, PriceSnapshot, Product
 
 TARGETS = ("roi", "popularity", "hype")
+#: série marché min par produit pour qu'un signal compte (anti séries trop courtes).
+_MARKET_MIN_POINTS = 4
 
 
 def _f(v) -> float | None:
     return float(v) if v is not None else None
+
+
+def market_features(db: Session, product_ref: str) -> dict | None:
+    """Features marché dérivées de ``market_price_snapshots`` (spread EU/US,
+    volatilité, momentum). ``None`` si la série est trop courte (garde-fou)."""
+    rows = db.scalars(
+        select(MarketPriceSnapshot).where(
+            MarketPriceSnapshot.product_ref == product_ref,
+            MarketPriceSnapshot.price.is_not(None),
+        ).order_by(MarketPriceSnapshot.captured_date.asc())
+    ).all()
+    if len(rows) < _MARKET_MIN_POINTS:
+        return None
+    eu = [float(r.price) for r in rows if r.market == "eu"]
+    us = [float(r.price) for r in rows if r.market == "us"]
+    series = eu or us
+    if len(series) < _MARKET_MIN_POINTS:
+        return None
+    mean = statistics.fmean(series)
+    vol = (statistics.pstdev(series) / mean * 100.0) if mean else 0.0
+    momentum = ((series[-1] - series[0]) / series[0] * 100.0) if series[0] else 0.0
+    spread = 0.0
+    if eu and us and eu[-1]:
+        spread = (us[-1] - eu[-1]) / eu[-1] * 100.0
+    return {"spread": spread, "volatility": vol, "momentum": momentum}
 
 
 def _latest_snapshot(db: Session, product_id: int) -> PriceSnapshot | None:
@@ -52,8 +81,9 @@ def build_training_rows(db: Session) -> tuple[list[list[float]], dict[str, list[
         vol_base = _f(snap.price_avg) or recent
         hype = ((hi - lo) / vol_base * 100.0) if (hi is not None and lo is not None and vol_base) else abs(roi)
 
+        mkt = market_features(db, str(product.id))
         X.append(extract_features(product_type=product.product_type, name=product.name,
-                                  language=product.language))
+                                  language=product.language, market=mkt))
         y["roi"].append(roi)
         y["popularity"].append(popularity)
         y["hype"].append(hype)

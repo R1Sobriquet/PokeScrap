@@ -13,11 +13,11 @@ import datetime as dt
 import json
 import logging
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_setting, invalidate_setting
-from app.models import Alert, Setting
+from app.models import Alert, DataQuarantine, MatchReview, Setting
 
 logger = logging.getLogger("services.source_health")
 
@@ -94,6 +94,33 @@ def _symptom(entry: dict, now: dt.datetime, max_age_h: int, min_volume: int) -> 
     return None
 
 
+def emit_daily_digest(db: Session, *, now: dt.datetime | None = None) -> bool:
+    """1×/jour (si ``alert_digest_enabled``) : 1 alerte INFO résumant les events
+    non urgents (quarantaine 24h + file de review) — batchée par ``flush_digest``."""
+    if not bool(get_setting("alert_digest_enabled", default=False)):
+        return False
+    now = now or _utcnow()
+    state = _load(db)
+    if state.get("last_digest_date") == now.date().isoformat():
+        return False  # déjà émis aujourd'hui
+
+    since = now - dt.timedelta(hours=24)
+    quarantined = db.scalar(select(func.count()).select_from(DataQuarantine)
+                            .where(DataQuarantine.created_at >= since)) or 0
+    reviews = db.scalar(select(func.count()).select_from(MatchReview)
+                        .where(MatchReview.status == "pending")) or 0
+    db.add(Alert(
+        alert_type="health", severity="info", status="pending",
+        title="Digest quotidien — moat de données",
+        payload={"subtype": "daily_digest", "quarantined_24h": int(quarantined),
+                 "match_review_pending": int(reviews),
+                 "message": f"{quarantined} en quarantaine (24h) · {reviews} à matcher."},
+    ))
+    state["last_digest_date"] = now.date().isoformat()
+    _save(db, state)
+    return True
+
+
 def check_sources(db: Session, *, now: dt.datetime | None = None,
                   cooldown_min: int | None = None) -> dict:
     """Évalue chaque source activée ; alerte santé (dédup) sur symptôme."""
@@ -142,6 +169,8 @@ def check_sources(db: Session, *, now: dt.datetime | None = None,
         _save(db, state)
     else:
         db.commit()  # persiste les alertes créées hors _save
+    if emit_daily_digest(db, now=now):
+        stats["digest"] = True
     stats["summary"] = (f"{stats['checked']} sources / {stats['unhealthy']} en panne "
                         f"/ {stats['alerts']} alertes")
     return stats

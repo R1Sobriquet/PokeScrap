@@ -8,12 +8,16 @@ du modèle — ils alimentent la confiance, calculée à part.
 
 from __future__ import annotations
 
-#: Ordre figé des features (le vecteur dépend de cet ordre).
+#: Ordre figé des features (le vecteur dépend de cet ordre). Les features marché
+#: valent 0 quand aucun snapshot n'existe (sorties futures incluses) → parité
+#: train/serve : le modèle apprend du produit-only à défaut, du signal marché si
+#: l'historique le permet.
 FEATURE_NAMES = [
     "is_sealed", "is_single",
     "kw_upc", "kw_etb", "kw_display", "kw_bundle", "kw_booster",
     "lang_en", "lang_jp",
     "name_tokens",
+    "mkt_has_data", "mkt_eu_us_spread", "mkt_volatility", "mkt_momentum",
 ]
 
 _KW = {
@@ -28,8 +32,12 @@ _SEALED_HINTS = ("etb", "coffret", "display", "booster box", "upc",
 
 
 def extract_features(*, product_type: str | None, name: str | None,
-                     language: str | None = "EN") -> list[float]:
-    """Vecteur de features (floats) dans l'ordre ``FEATURE_NAMES``."""
+                     language: str | None = "EN", market: dict | None = None) -> list[float]:
+    """Vecteur de features (floats) dans l'ordre ``FEATURE_NAMES``.
+
+    ``market`` (optionnel) : ``{spread, volatility, momentum}`` dérivés des
+    ``market_price_snapshots`` ; absent → bloc marché à 0 (parité train/serve).
+    """
     ptype = (product_type or "").lower()
     blob = f"{ptype} {name or ''}".lower()
 
@@ -44,9 +52,16 @@ def extract_features(*, product_type: str | None, name: str | None,
 
     name_tokens = min(len((name or "").split()), 12) / 12.0
 
+    m = market or {}
+    mkt_has = 1.0 if m else 0.0
+    mkt_spread = float(m.get("spread", 0.0) or 0.0)
+    mkt_vol = float(m.get("volatility", 0.0) or 0.0)
+    mkt_mom = float(m.get("momentum", 0.0) or 0.0)
+
     return [
         is_sealed, is_single,
         kw["kw_upc"], kw["kw_etb"], kw["kw_display"], kw["kw_bundle"], kw["kw_booster"],
         lang_en, lang_jp,
         name_tokens,
+        mkt_has, mkt_spread, mkt_vol, mkt_mom,
     ]

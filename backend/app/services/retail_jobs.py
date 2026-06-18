@@ -17,7 +17,7 @@ import datetime as dt
 import logging
 import time
 
-from sqlalchemy import select
+from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
 from app.config import get_setting
@@ -54,7 +54,8 @@ def _sourcing_off() -> bool:
     return not bool(get_setting("retail_sourcing_enabled", default=False))
 
 
-def create_retail_alert(db: Session, *, kind: str, offer: RetailOffer, retailer_name: str) -> Alert:
+def create_retail_alert(db: Session, *, kind: str, offer: RetailOffer, retailer_name: str,
+                        severity: str = "warning") -> Alert:
     """Crée une alerte pending (type ``restock``/``new_sku``) pour le dispatcher."""
     alert_type = "restock" if kind == "RESTOCK" else "new_sku"
     price = float(offer.current_price) if offer.current_price is not None else None
@@ -69,9 +70,11 @@ def create_retail_alert(db: Session, *, kind: str, offer: RetailOffer, retailer_
         "offer_id": offer.id,
         "message": f"{label} chez {retailer_name}.",
     }
+    # severity décidée par l'appelant AVANT tout flush (un get_setting ici, après
+    # un flush, romprait la transaction sur StaticPool en test). Restock = urgent.
     alert = Alert(
         alert_type=alert_type,
-        severity="warning",
+        severity=severity,
         status="pending",
         title=offer.title or offer.url,
         payload=payload,
@@ -91,6 +94,18 @@ def _recent_restock(db: Session, offer_id: int, cooldown_min: int, now: dt.datet
     return db.scalar(stmt) is not None
 
 
+def _is_flapping(db: Session, offer_id: int, debounce_min: int, now: dt.datetime) -> bool:
+    """Anti-flapping : ≥2 transitions d'état dans la fenêtre debounce = oscillation."""
+    if debounce_min <= 0:
+        return False
+    cutoff = now - dt.timedelta(minutes=debounce_min)
+    n = db.scalar(select(func.count()).select_from(RetailStockEvent).where(
+        RetailStockEvent.offer_id == offer_id,
+        RetailStockEvent.detected_at >= cutoff,
+    )) or 0
+    return int(n) >= 2
+
+
 def _due_for_check(offer: RetailOffer, interval_min: int, now: dt.datetime) -> bool:
     """Respecte l'intervalle min entre deux checks d'une même offre (économie requêtes)."""
     if offer.last_checked_at is None:
@@ -108,6 +123,7 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
     min_delay = int(get_setting("retail_min_delay_ms", default=3000))
     interval = int(get_setting("retail_check_interval_min", default=60))
     cooldown = int(get_setting("retail_restock_cooldown_min", default=360))
+    debounce = int(get_setting("restock_debounce_min", default=30))
     max_err = int(get_setting("retail_circuit_max_errors", default=5))
     cooldown_cap = int(get_setting("scrape_blocked_cooldown_min", default=120))
 
@@ -165,7 +181,8 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
                     detected_at=now,
                 ))
                 offer.last_changed_at = now
-                if alert and not dry and not _recent_restock(db, offer.id, cooldown, now):
+                if (alert and not dry and not _recent_restock(db, offer.id, cooldown, now)
+                        and not _is_flapping(db, offer.id, debounce, now)):
                     db.flush()  # garantit offer.id pour le payload
                     create_retail_alert(db, kind="RESTOCK", offer=offer, retailer_name=retailer.name)
                     stats["alerts"] += 1
@@ -322,6 +339,8 @@ def run_detect_new_skus(db: Session, *, http_get: HttpGet | None = None) -> dict
     cap = int(get_setting("retail_request_cap_per_run", default=40))
     max_err = int(get_setting("retail_circuit_max_errors", default=5))
     cooldown_cap = int(get_setting("scrape_blocked_cooldown_min", default=120))
+    # Nouveau SKU = non urgent → digesté (severity info) si le digest est activé.
+    sku_severity = "info" if bool(get_setting("alert_digest_enabled", default=False)) else "warning"
     getter = http_get or httpx_get
     budget = politeness.RequestBudget(cap)
     now = _utcnow()
@@ -369,7 +388,8 @@ def run_detect_new_skus(db: Session, *, http_get: HttpGet | None = None) -> dict
             known.add(sku.url)
             stats["new_offers"] += 1
             if not dry and stats["alerts"] < _NEW_SKU_ALERT_CAP:
-                create_retail_alert(db, kind="NEW_SKU", offer=offer, retailer_name=retailer.name)
+                create_retail_alert(db, kind="NEW_SKU", offer=offer, retailer_name=retailer.name,
+                                    severity=sku_severity)
                 stats["alerts"] += 1
         db.commit()
 

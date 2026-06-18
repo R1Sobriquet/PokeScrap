@@ -157,15 +157,23 @@ def run_job(job_name: str, background: BackgroundTasks, db: Session = Depends(ge
 
 @router.get("/admin/jobs/recent")
 def jobs_recent(db: Session = Depends(get_db)) -> dict:
+    from app.models import MlModel
+
     runs = [_job_run_dict(r) for r in jobs_service.recent_runs(db)]
     watchlist_count = db.scalar(
         select(func.count()).select_from(Watchlist).where(Watchlist.is_active == 1)
     ) or 0
+    ml = db.scalar(select(MlModel).where(MlModel.name == "release_scorer"))
+    ml_model = None
+    if ml is not None:
+        ml_model = {"n_samples": ml.n_samples, "metrics": ml.metrics,
+                    "trained_at": ml.trained_at.isoformat() if ml.trained_at else None}
     return {
         "jobs": list(jobs_service.JOBS),
         "runs": runs,
         "watchlist_count": int(watchlist_count),
         "poketrace_daily_limit": int(float(get_setting("poketrace_daily_limit", default=250))),
+        "ml_model": ml_model,
     }
 
 
