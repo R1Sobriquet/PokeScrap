@@ -27,7 +27,7 @@ from app.services.tracked_sets import ensure_default_tracked_sets
 setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("backend")
 
-EXPECTED_TABLES = 19  # 14 socle + 4 PokéStock FR + 1 ml_models (Future Radar)
+EXPECTED_TABLES = 22  # +3 moat marché (market_price_snapshots/data_quarantine/match_review)
 EXPECTED_TIERS = 4
 MIN_SETTINGS = 80
 

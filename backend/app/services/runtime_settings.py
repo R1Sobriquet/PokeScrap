@@ -54,6 +54,23 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("retail_restock_cooldown_min", "360", "int", "Cooldown (min) avant ré-alerte sur une même offre"),
     ("retail_circuit_max_errors", "5", "int", "Erreurs consécutives avant circuit breaker d'un détaillant"),
     ("telegram_enabled", "false", "bool", "Active les notifications Telegram (token/chat_id dans .env)"),
+    # Moat de données marché — multi-sources (défauts prudents : tout OFF, watched-only)
+    ("marketdata_enabled", "false", "bool", "Master switch du moat de données marché"),
+    ("marketdata_ppt_enabled", "false", "bool", "Active la source PokemonPriceTracker (clé requise)"),
+    ("marketdata_tcgdex_enabled", "true", "bool", "Active TCGdex (catalogue/calendrier, gratuit sans clé)"),
+    ("marketdata_ebay_enabled", "false", "bool", "Active eBay Browse (annonces FR, OAuth requis)"),
+    ("marketdata_request_cap_per_run_ppt", "90", "int", "Plafond requêtes/run PPT (quota free 100/j, marge)"),
+    ("marketdata_request_cap_per_run_tcgdex", "60", "int", "Plafond requêtes/run TCGdex"),
+    ("marketdata_request_cap_per_run_ebay", "40", "int", "Plafond requêtes/run eBay Browse"),
+    ("marketdata_min_delay_ms", "1500", "int", "Délai min (ms) entre requêtes d'une même source marché"),
+    ("marketdata_circuit_max_errors", "5", "int", "Erreurs consécutives avant circuit breaker d'une source"),
+    ("match_confidence_threshold", "0.82", "decimal", "Seuil d'auto-acceptation du matching (sinon match_review)"),
+    ("alert_digest_enabled", "false", "bool", "Regroupe les events non urgents en 1 digest/jour"),
+    ("alert_digest_hour", "9", "int", "Heure (locale Paris) d'envoi du digest quotidien"),
+    ("restock_debounce_min", "30", "int", "Anti-flapping : ignore les oscillations d'état sous N minutes"),
+    ("source_health_fresh_max_age_h", "30", "int", "Âge max (h) d'un snapshot avant 'source muette'"),
+    ("source_health_min_volume", "1", "int", "Volume min attendu par run avant 'source cassée'"),
+    ("sanity_bounds_eur", '{"etb":[15,400],"display":[60,900],"upc":[40,400],"coffret":[15,400],"booster":[2,60],"bundle":[15,300],"autre":[1,5000]}', "json", "Bornes de sanité prix EUR par product_type (rejet → quarantaine)"),
 ]
 
 

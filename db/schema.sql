@@ -433,6 +433,53 @@ CREATE TABLE ml_models (
     UNIQUE KEY uq_ml_model_name (name)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ------------------ Moat de données marché : market_price_snapshots -
+CREATE TABLE market_price_snapshots (
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    product_ref   VARCHAR(64)  NOT NULL,
+    source        ENUM('ppt','tcgdex','ebay','poketrace') NOT NULL,
+    market        ENUM('us','eu') NOT NULL,
+    product_type  VARCHAR(16)  NULL,
+    price         DECIMAL(8,2) NULL,
+    currency      CHAR(3)      NOT NULL DEFAULT 'EUR',
+    extra         JSON         NULL,
+    captured_at   DATETIME     NOT NULL,
+    captured_date DATE         NOT NULL,
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_market_snapshot_day (product_ref, source, market, captured_date),
+    KEY idx_market_ref_date (product_ref, captured_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------- Garde-fous : data_quarantine -----------
+CREATE TABLE data_quarantine (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    source      VARCHAR(16)  NOT NULL,
+    product_ref VARCHAR(64)  NULL,
+    raw         JSON         NULL,
+    reason      VARCHAR(255) NOT NULL,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_quarantine_created (created_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------------- Matching : match_review ----------------
+CREATE TABLE match_review (
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    product_ref   VARCHAR(64)  NOT NULL,
+    candidate_ref VARCHAR(64)  NULL,
+    source        VARCHAR(16)  NULL,
+    method        VARCHAR(16)  NULL,
+    confidence    DECIMAL(5,2) NULL,
+    payload       JSON         NULL,
+    status        VARCHAR(16)  NOT NULL DEFAULT 'pending',
+    created_at    DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    resolved_at   DATETIME     NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_match_review_pair (product_ref, candidate_ref),
+    KEY idx_match_review_status (status)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- =====================================================================
 --  SEED — Paliers
 -- =====================================================================
