@@ -34,6 +34,7 @@ CHANNEL_ROUTING = {
     "tech_error": "systeme",
     "restock": "restock",
     "new_sku": "restock",
+    "health": "health",
 }
 
 #: État stock → pastille pour les embeds restock.

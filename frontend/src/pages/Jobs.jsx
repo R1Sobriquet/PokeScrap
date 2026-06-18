@@ -16,10 +16,14 @@ const JOB_LABELS = {
   "retail-refresh-prices": "Rafraîchir prix retail",
   "retail-backfill-images": "Backfill images retail",
   "train-release-model": "Entraîner le modèle (Future Radar)",
+  "market-snapshot-daily": "Snapshot prix marché",
+  "calendar-sync": "Sync calendrier (auto)",
+  "match-products": "Matcher les produits",
+  "source-health-check": "Check santé des sources",
 };
 const ORDER = ["sync-tracked-sets", "refresh-prices", "scan-movers", "evaluate-sales", "kpi-snapshot",
   "retail-check-restocks", "retail-detect-new-skus", "retail-refresh-prices", "retail-backfill-images",
-  "train-release-model"];
+  "train-release-model", "market-snapshot-daily", "calendar-sync", "match-products", "source-health-check"];
 const QUOTA_WARN = 200;  // > X produits suivis : risque de dépasser le quota Free (250/j)
 
 function sevFor(status) {

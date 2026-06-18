@@ -22,7 +22,7 @@ from app.notifications.specs import EmbedSpec
 logger = logging.getLogger("adapters.telegram_notifier")
 
 #: Canaux logiques relayés vers Telegram (les autres restent Discord-only).
-TELEGRAM_CHANNELS = {"restock"}
+TELEGRAM_CHANNELS = {"restock", "health"}
 
 #: ``poster(token, payload) -> None`` — injectable en test.
 Poster = Callable[[str, dict], None]

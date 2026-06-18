@@ -151,6 +151,43 @@ def train_release_model() -> None:
     logger.info("train_release_model: %s", result.get("summary"))
 
 
+def market_snapshot_daily() -> None:
+    # Moat : tire les prix marché des produits watchés (no-op si désactivé).
+    from app.services.market_snapshot import run_market_snapshot
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_market_snapshot(db)
+    logger.info("market_snapshot_daily: %s", result.get("summary"))
+
+
+def calendar_sync() -> None:
+    from app.services.calendar_sync import run_calendar_sync
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_calendar_sync(db)
+    logger.info("calendar_sync: %s", result.get("summary"))
+
+
+def match_products() -> None:
+    from app.services.product_matching import run_match_products
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_match_products(db)
+    logger.info("match_products: %s", result.get("summary"))
+
+
+def source_health_check() -> None:
+    from app.services.source_health import check_sources
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = check_sources(db)
+    logger.info("source_health_check: %s", result.get("summary"))
+
+
 def main() -> None:
     scheduler = BlockingScheduler(timezone=TIMEZONE)
     scheduler.add_job(heartbeat, "interval", minutes=1, id="heartbeat")
@@ -197,6 +234,12 @@ def main() -> None:
         CronTrigger(day_of_week="sun", hour=3, minute=30, timezone=TIMEZONE),
         id="train_release_model",
     )
+    # Moat de données marché — agressif sur le planning, léger sur les requêtes.
+    # Snapshot quotidien 02:00 ; calendrier + matching 1×/jour ; santé toutes les 2h.
+    scheduler.add_job(market_snapshot_daily, CronTrigger(hour=2, minute=0, timezone=TIMEZONE), id="market_snapshot_daily")
+    scheduler.add_job(calendar_sync, CronTrigger(hour=4, minute=40, timezone=TIMEZONE), id="calendar_sync")
+    scheduler.add_job(match_products, CronTrigger(hour=5, minute=20, timezone=TIMEZONE), id="match_products")
+    scheduler.add_job(source_health_check, "interval", hours=2, id="source_health_check")
     logger.info(
         "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly, deadman=30m).",
         TIMEZONE,

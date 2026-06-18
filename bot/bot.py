@@ -45,6 +45,7 @@ CHANNELS = {
     "portefeuille": os.getenv("DISCORD_CHANNEL_PORTEFEUILLE", ""),
     "systeme": os.getenv("DISCORD_CHANNEL_SYSTEME", ""),
     "restock": os.getenv("DISCORD_CHANNEL_RESTOCK", ""),  # PokéStock FR
+    "health": os.getenv("DISCORD_CHANNEL_HEALTH", ""),    # moniteur sources marché
 }
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")

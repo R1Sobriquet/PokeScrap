@@ -75,6 +75,30 @@ def _run_train_release_model(db: Session) -> dict:
     return run_train_release_model(db)
 
 
+def _run_market_snapshot(db: Session) -> dict:
+    from app.services.market_snapshot import run_market_snapshot
+
+    return run_market_snapshot(db)
+
+
+def _run_calendar_sync(db: Session) -> dict:
+    from app.services.calendar_sync import run_calendar_sync
+
+    return run_calendar_sync(db)
+
+
+def _run_match_products(db: Session) -> dict:
+    from app.services.product_matching import run_match_products
+
+    return run_match_products(db)
+
+
+def _run_source_health_check(db: Session) -> dict:
+    from app.services.source_health import check_sources
+
+    return check_sources(db)
+
+
 JOBS = {
     "sync-tracked-sets": _run_sync_tracked_sets,
     "refresh-prices": _run_refresh_prices,
@@ -88,6 +112,11 @@ JOBS = {
     "retail-backfill-images": run_backfill_images,
     # Future Radar — (ré)entraînement du modèle ML de scoring des sorties.
     "train-release-model": _run_train_release_model,
+    # Moat de données marché — snapshots, calendrier, matching, moniteur santé.
+    "market-snapshot-daily": _run_market_snapshot,
+    "calendar-sync": _run_calendar_sync,
+    "match-products": _run_match_products,
+    "source-health-check": _run_source_health_check,
 }
 
 
