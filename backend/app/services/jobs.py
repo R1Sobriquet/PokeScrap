@@ -18,6 +18,12 @@ from app.models import JobRun
 from app.services.ingestion import ingest_watchlist_prices
 from app.services.kpi_snapshot import run_kpi_snapshot
 from app.services.movers import compute_top_movers
+from app.services.retail_jobs import (
+    run_backfill_images,
+    run_check_restocks,
+    run_detect_new_skus,
+    run_refresh_prices,
+)
 from app.services.runtime_settings import ensure_runtime_settings
 from app.services.selling_service import evaluate_position_sales
 from app.services.tracked_sets import ensure_default_tracked_sets, sync_tracked_sets
@@ -63,12 +69,61 @@ def _run_kpi_snapshot(db: Session) -> dict:
     return r
 
 
+def _run_train_release_model(db: Session) -> dict:
+    from app.ml.scorer import run_train_release_model
+
+    return run_train_release_model(db)
+
+
+def _run_market_snapshot(db: Session) -> dict:
+    from app.services.market_snapshot import run_market_snapshot
+
+    return run_market_snapshot(db)
+
+
+def _run_calendar_sync(db: Session) -> dict:
+    from app.services.calendar_sync import run_calendar_sync
+
+    return run_calendar_sync(db)
+
+
+def _run_match_products(db: Session) -> dict:
+    from app.services.product_matching import run_match_products
+
+    return run_match_products(db)
+
+
+def _run_source_health_check(db: Session) -> dict:
+    from app.services.source_health import check_sources
+
+    return check_sources(db)
+
+
+def _run_flip_radar(db: Session) -> dict:
+    from app.services.flip_radar import run_flip_radar
+
+    return run_flip_radar(db)
+
+
 JOBS = {
     "sync-tracked-sets": _run_sync_tracked_sets,
     "refresh-prices": _run_refresh_prices,
     "scan-movers": _run_scan_movers,
     "evaluate-sales": _run_evaluate_sales,
     "kpi-snapshot": _run_kpi_snapshot,
+    # PokéStock FR — veille restock (réutilisent job_runs + le panel)
+    "retail-check-restocks": run_check_restocks,
+    "retail-detect-new-skus": run_detect_new_skus,
+    "retail-refresh-prices": run_refresh_prices,
+    "retail-backfill-images": run_backfill_images,
+    # Future Radar — (ré)entraînement du modèle ML de scoring des sorties.
+    "train-release-model": _run_train_release_model,
+    # Moat de données marché — snapshots, calendrier, matching, moniteur santé.
+    "market-snapshot-daily": _run_market_snapshot,
+    "calendar-sync": _run_calendar_sync,
+    "match-products": _run_match_products,
+    "source-health-check": _run_source_health_check,
+    "flip-radar-scan": _run_flip_radar,
 }
 
 

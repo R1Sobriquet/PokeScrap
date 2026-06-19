@@ -3,7 +3,9 @@ import { LineChart, Line, ResponsiveContainer } from "recharts";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table, Badge, eur } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader, eur } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 function Sparkline({ latest }) {
   if (!latest) return <span className="text-slate-600">—</span>;
@@ -32,6 +34,7 @@ const EMPTY_ADD = {
 
 export default function Watchlist() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data, reload } = usePolling("/watchlist");
   const { data: alerts } = usePolling("/alerts?status=pending", { intervalSec: 60 });
   const [editing, setEditing] = useState(null);
@@ -71,7 +74,13 @@ export default function Watchlist() {
   }
 
   const cols = [
-    { key: "name", label: "Produit", render: (r) => r.product?.name },
+    { key: "name", label: "Produit", render: (r) => (
+        <div className="flex items-center gap-2.5">
+          <ProductImage src={r.product?.image_url} alt={r.product?.name} seed={r.product?.set_slug}
+                        style={{ width: 32, height: 44 }} />
+          <span className="font-medium">{r.product?.name}</span>
+        </div>
+      ) },
     { key: "tier", label: "Tier", render: (r) =>
         editing === r.product_id ? (
           <input className="w-16 rounded bg-slate-800 px-1" defaultValue={r.tier}
@@ -102,7 +111,7 @@ export default function Watchlist() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Watchlist</h1>
+      <PageHeader title={t("nav.watchlist")} subtitle={t("watchlist.subtitle")} />
       <div className={`rounded border px-3 py-2 text-sm ${peActive
         ? "border-info/40 bg-info/10 text-info" : "border-slate-800 bg-slate-900 text-slate-400"}`}>
         Signal d'accumulation Prismatic Evolutions : <b>{peActive ? "ACTIF" : "inactif"}</b>
@@ -110,7 +119,7 @@ export default function Watchlist() {
 
       <Card title="Watchlist"
             right={<button onClick={() => setShowAdd((v) => !v)}
-              className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">+ Ajouter une carte/produit</button>}>
+              className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">+ Ajouter une carte/produit</button>}>
         {showAdd && (
           <form onSubmit={addCard} className="mb-4 grid gap-2 rounded border border-slate-800 p-3 md:grid-cols-3">
             <label className="text-xs md:col-span-3">Recherche PokeTrace (requis)
@@ -150,7 +159,7 @@ export default function Watchlist() {
             {addMsg && <p className="text-xs text-critical md:col-span-3">{addMsg}</p>}
             <div className="md:col-span-3">
               <button type="submit" disabled={adding}
-                      className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900 disabled:opacity-60">
+                      className="rounded bg-info px-3 py-1 text-sm font-medium text-ink disabled:opacity-60">
                 {adding ? "Recherche…" : "Ajouter"}
               </button>
             </div>

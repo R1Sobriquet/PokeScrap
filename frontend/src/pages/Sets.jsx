@@ -2,12 +2,15 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table, Badge, eur, pct } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader, eur, pct } from "../components/ui.jsx";
+import ProductImage from "../components/ProductImage.jsx";
 
 const EMPTY = { name: "", set_slug: "", min_value_eur: "5", include_single: true, include_sealed: true };
 
 export default function Sets() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data: sets, reload } = usePolling("/tracked-sets", { intervalSec: 120 });
   const { data: movers } = usePolling("/movers");
   const [showForm, setShowForm] = useState(false);
@@ -58,7 +61,7 @@ export default function Sets() {
       ) },
     { key: "is_active", label: "Actif", render: (s) => (
         <button onClick={() => toggle(s)}
-          className={`rounded px-3 py-1 text-xs ${s.is_active ? "bg-info text-slate-900" : "bg-slate-700 text-slate-300"}`}>
+          className={`rounded px-3 py-1 text-xs ${s.is_active ? "bg-info text-ink" : "bg-slate-700 text-slate-300"}`}>
           {s.is_active ? "ON" : "off"}
         </button>
       ) },
@@ -68,7 +71,12 @@ export default function Sets() {
   ];
 
   const moverCols = [
-    { key: "name", label: "Produit" },
+    { key: "name", label: "Produit", render: (m) => (
+        <div className="flex items-center gap-2.5">
+          <ProductImage src={m.image_url} alt={m.name} seed={m.set_slug} style={{ width: 30, height: 42 }} />
+          <span className="font-medium">{m.name}</span>
+        </div>
+      ) },
     { key: "set_slug", label: "Set", render: (m) => <span className="text-xs text-slate-500">{m.set_slug}</span> },
     { key: "rise_pct", label: "Hausse 7j/30j", render: (m) => (
         <span className={m.rise_pct >= 0 ? "text-info" : "text-critical"}>{pct(m.rise_pct)}</span>
@@ -80,11 +88,11 @@ export default function Sets() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Sets suivis & Top movers</h1>
+      <PageHeader title={t("nav.sets")} subtitle={t("sets.subtitle")} />
 
       <Card title="Sets cibles (auto-watchlist)"
             right={<button onClick={() => setShowForm((v) => !v)}
-              className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">+ Ajouter un set cible</button>}>
+              className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">+ Ajouter un set cible</button>}>
         {showForm && (
           <form onSubmit={submit} className="mb-4 grid gap-2 rounded border border-slate-800 p-3 md:grid-cols-2">
             <label className="text-xs">Nom
@@ -103,7 +111,7 @@ export default function Sets() {
             </div>
             {err && <p className="text-xs text-critical md:col-span-2">{err}</p>}
             <div className="md:col-span-2">
-              <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-slate-900">Ajouter</button>
+              <button type="submit" className="rounded bg-info px-3 py-1 text-sm font-medium text-ink">Ajouter</button>
             </div>
           </form>
         )}

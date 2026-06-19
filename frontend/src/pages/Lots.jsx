@@ -2,10 +2,12 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Table, Badge, eur } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Table, Badge, PageHeader, eur } from "../components/ui.jsx";
 
 export default function Lots() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data: lots, reload } = usePolling("/lots");
   const [selected, setSelected] = useState(null);
   const { data: items, reload: reloadItems } = usePolling(
@@ -50,7 +52,7 @@ export default function Lots() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Lots & Liquidation</h1>
+      <PageHeader title={t("nav.lots")} subtitle={t("lots.subtitle")} />
       <Card title="Lots reçus">
         <Table columns={lotCols} rows={lots || []} empty="Aucun lot (créés à l'exécution d'achat Discord)" />
       </Card>

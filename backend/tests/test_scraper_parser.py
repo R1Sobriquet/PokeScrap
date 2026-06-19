@@ -74,3 +74,31 @@ def test_break_detection_no_container():
     res = parse_listings("<html><body></body></html>", VINTED_SEL, platform="vinted", break_threshold=30)
     assert res.broken is True
     assert "0 conteneur" in res.reason
+
+
+def test_image_extraction_src_and_lazy_and_relative():
+    sel = {"container": "div.card", "title": "span.t", "price": "span.p",
+           "link": "a", "image": "img", "base_url": "https://www.vinted.fr"}
+    html = (
+        '<div class="card"><a href="/items/111-x"></a><span class="t">Lot Pokémon</span>'
+        '<span class="p">30,00 €</span><img src="https://cdn/img1.jpg"></div>'
+        '<div class="card"><a href="/items/222-y"></a><span class="t">ETB 151</span>'
+        '<span class="p">59,00 €</span><img data-src="/media/lazy2.jpg"></div>'
+        '<div class="card"><a href="/items/333-z"></a><span class="t">Booster box</span>'
+        '<span class="p">90,00 €</span><img srcset="https://cdn/small.jpg 1x, https://cdn/big.jpg 2x"></div>'
+    )
+    res = parse_listings(html, sel, platform="vinted", break_threshold=50)
+    assert [l.image_url for l in res.listings] == [
+        "https://cdn/img1.jpg",
+        "https://www.vinted.fr/media/lazy2.jpg",
+        "https://cdn/small.jpg",
+    ]
+
+
+def test_image_absent_or_data_uri_yields_none():
+    sel = {"container": "div.card", "title": "span.t", "price": "span.p", "image": "img.photo"}
+    html = ('<div class="card"><span class="t">A</span><span class="p">10 €</span></div>'
+            '<div class="card"><span class="t">B</span><span class="p">12 €</span>'
+            '<img class="photo" src="data:image/gif;base64,xxx"></div>')
+    res = parse_listings(html, sel, platform="vinted", break_threshold=50)
+    assert all(l.image_url is None for l in res.listings)

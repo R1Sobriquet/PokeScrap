@@ -2,7 +2,8 @@ import { useState } from "react";
 import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
-import { Card, Badge } from "../components/ui.jsx";
+import { useI18n } from "../i18n.jsx";
+import { Card, Badge, PageHeader } from "../components/ui.jsx";
 
 const JOB_LABELS = {
   "sync-tracked-sets": "Synchroniser les sets",
@@ -10,8 +11,21 @@ const JOB_LABELS = {
   "scan-movers": "Scanner les top movers",
   "evaluate-sales": "Évaluer les ventes",
   "kpi-snapshot": "Snapshot KPI",
+  "retail-check-restocks": "Veille restock (check)",
+  "retail-detect-new-skus": "Détecter nouveaux SKU",
+  "retail-refresh-prices": "Rafraîchir prix retail",
+  "retail-backfill-images": "Backfill images retail",
+  "train-release-model": "Entraîner le modèle (Future Radar)",
+  "market-snapshot-daily": "Snapshot prix marché",
+  "calendar-sync": "Sync calendrier (auto)",
+  "match-products": "Matcher les produits",
+  "source-health-check": "Check santé des sources",
+  "flip-radar-scan": "Flip Radar (opportunités)",
 };
-const ORDER = ["sync-tracked-sets", "refresh-prices", "scan-movers", "evaluate-sales", "kpi-snapshot"];
+const ORDER = ["sync-tracked-sets", "refresh-prices", "scan-movers", "evaluate-sales", "kpi-snapshot",
+  "retail-check-restocks", "retail-detect-new-skus", "retail-refresh-prices", "retail-backfill-images",
+  "train-release-model", "market-snapshot-daily", "calendar-sync", "match-products", "source-health-check",
+  "flip-radar-scan"];
 const QUOTA_WARN = 200;  // > X produits suivis : risque de dépasser le quota Free (250/j)
 
 function sevFor(status) {
@@ -20,6 +34,7 @@ function sevFor(status) {
 
 export default function Jobs() {
   const { token } = useAuth();
+  const { t } = useI18n();
   const { data, reload } = usePolling("/admin/jobs/recent", { intervalSec: 5 });
   const [msg, setMsg] = useState(null);
 
@@ -47,7 +62,7 @@ export default function Jobs() {
 
   return (
     <div className="space-y-4">
-      <h1 className="text-xl font-bold">Actions & Jobs</h1>
+      <PageHeader title={t("nav.jobs")} subtitle={t("jobs.subtitle")} />
       {msg && <div className="rounded border border-slate-700 bg-slate-900 px-3 py-2 text-sm">{msg}</div>}
 
       <div className="grid gap-3 md:grid-cols-2">
@@ -62,7 +77,7 @@ export default function Jobs() {
                   disabled={running}
                   className={`rounded px-3 py-2 text-sm font-medium ${
                     running ? "cursor-not-allowed bg-slate-700 text-slate-400"
-                            : "bg-info text-slate-900 hover:opacity-90"}`}
+                            : "bg-info text-ink hover:opacity-90"}`}
                 >
                   {running ? "En cours…" : "Lancer"}
                 </button>
@@ -82,6 +97,18 @@ export default function Jobs() {
                   {watchlistCount} produits suivis · quota Free {quotaLimit}/j
                   {watchlistCount > QUOTA_WARN ? " — risque de dépassement, fractionne." : ""}
                 </p>
+              )}
+              {name === "train-release-model" && data?.ml_model?.metrics && (
+                <div className="mt-2 font-mono text-[11px] text-slate-400">
+                  <div className="text-slate-500">CV (held-out) · n={data.ml_model.n_samples}</div>
+                  {["roi", "popularity", "hype"].map((tg) =>
+                    data.ml_model.metrics[tg] ? (
+                      <div key={tg}>
+                        {tg}: R²={data.ml_model.metrics[tg].cv_r2} · MAE={data.ml_model.metrics[tg].cv_mae}
+                      </div>
+                    ) : null
+                  )}
+                </div>
               )}
             </Card>
           );

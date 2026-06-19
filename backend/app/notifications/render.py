@@ -32,6 +32,17 @@ CHANNEL_ROUTING = {
     "reinvest": "portefeuille",
     "tax_provision": "portefeuille",
     "tech_error": "systeme",
+    "restock": "restock",
+    "new_sku": "restock",
+    "health": "health",
+}
+
+#: État stock → pastille pour les embeds restock.
+_STOCK_BADGE = {
+    "in_stock": "✅ En stock",
+    "preorder": "🟡 Précommande",
+    "out_of_stock": "❌ Rupture",
+    "unknown": "❔ Inconnu",
 }
 
 
@@ -126,6 +137,43 @@ def _sell_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ...]
     return embed, buttons
 
 
+def _retail_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ...]]:
+    """Embed veille restock (✅/❌ par enseigne, prix, lien direct)."""
+    is_new = alert.alert_type == "new_sku"
+    state = payload.get("stock_state", "unknown")
+    price = payload.get("price")
+    currency = payload.get("currency", "EUR")
+    url = payload.get("url")
+    fields = [
+        EmbedField("Enseigne", str(payload.get("retailer", "—"))),
+        EmbedField("État", _STOCK_BADGE.get(state, state or "—")),
+        EmbedField("Prix (MSRP)", f"{_money(price)} {currency}" if price is not None else "—"),
+    ]
+    # Flip value : acheter au MSRP, revendre au marché.
+    verdict = payload.get("verdict")
+    if verdict is not None:
+        mv = payload.get("market_value")
+        upside = payload.get("upside_pct")
+        tone_icon = {"buy": "🟢", "fair": "🔵", "pass": "🔴"}.get(payload.get("verdict_tone"), "")
+        fields.append(EmbedField("Valeur marché", f"{_money(mv)} {currency}" if mv is not None else "—"))
+        fields.append(EmbedField(
+            "Flip",
+            f"{tone_icon} {verdict}" + (f" ({'+' if (upside or 0) >= 0 else ''}{upside}%)" if upside is not None else ""),
+        ))
+    icon = "🆕" if is_new else "🔔"
+    label = "Nouveau SKU" if is_new else "Restock"
+    embed = EmbedSpec(
+        title=f"{icon} {label} — {alert.title}",
+        description=payload.get("message"),
+        color=SEVERITY_COLORS.get(alert.severity, SEVERITY_COLORS["warning"]),
+        fields=tuple(fields),
+        footer=_footer(alert.created_at),
+        url=url,
+    )
+    buttons = (ButtonSpec("Voir le produit", style=STYLE_LINK, url=url),) if url else ()
+    return embed, buttons
+
+
 def _generic_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ...]]:
     embed = EmbedSpec(
         title=alert.title,
@@ -149,6 +197,8 @@ def render_alert(alert) -> RenderedAlert:
         embed, buttons = _sell_embed(alert, payload)
     elif alert.alert_type in ("palier_up", "palier_down"):
         embed, buttons = _palier_embed(alert, payload)
+    elif alert.alert_type in ("restock", "new_sku"):
+        embed, buttons = _retail_embed(alert, payload)
     else:  # tech_error, sell_reminder, reinvest… : embed sans bouton
         embed, buttons = _generic_embed(alert, payload)
     return RenderedAlert(channel_key=channel_for(alert.alert_type), embed=embed, buttons=buttons)

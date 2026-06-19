@@ -99,6 +99,7 @@ def _upsert_and_evaluate(
         asking_price=raw.asking_price,
         shipping_cost=raw.shipping_cost,
         location=raw.location,
+        image_url=raw.image_url,
         listed_at=raw.listed_at,
         detected_at=now,
         detected_products=detected,

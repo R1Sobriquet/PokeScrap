@@ -63,3 +63,8 @@ def clear_block(db: Session, platform: str) -> None:
     if platform in state:
         state.pop(platform)
         _save(db, state)
+
+
+def block_info(db: Session, platform: str) -> dict:
+    """État brut du backoff d'une plateforme : ``{count, until}`` (vide si aucun)."""
+    return _load(db).get(platform, {})

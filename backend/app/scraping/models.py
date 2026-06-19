@@ -37,4 +37,5 @@ class RawListing:
     asking_price: float
     shipping_cost: float = 0.0
     location: str | None = None
+    image_url: str | None = None
     listed_at: dt.datetime | None = None

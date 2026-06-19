@@ -43,6 +43,161 @@ l'investissement dans les cartes Pokémon (arbitrage, portefeuille, alertes).
 > price_snapshots 1/jour/tier), validation **Free→Pro** scriptée, compose durci
 > (localhost, `restart: unless-stopped`, healthchecks), et **runbooks** de go-live.
 
+## PokéStock FR — veille restock (détaillants FR)
+
+Module de veille stock pour collectionneurs : **détection de restock** sur une
+watchlist d'offres scellées, **détection de nouveaux SKU**, alertes **Discord
+(nouveau canal) + Telegram**. Cibles V1 : **Cultura, Fnac, Micromania**.
+
+- **Sourcing hybride léger (httpx, pas de Playwright).** Radar nouveaux SKU via
+  **sitemaps** ; état stock + prix via **fetch de la page produit** (JSON-LD
+  `Product`/`Offer` prioritaire, **fallback DOM** si absent). Tourne dans les
+  conteneurs existants (backend on-demand + scheduler).
+- **Politesse OBLIGATOIRE** : respect `robots.txt`, UA réaliste, intervalle min +
+  jitter, **plafond de requêtes/run**, **backoff exponentiel** sur 403/429 et
+  **circuit breaker** par détaillant (réutilise `scrape_state`). **Fnac** =
+  watchlist-only (jamais le catalogue). Aucune escalade anti-bot (pas de proxies,
+  pas de captcha).
+- **Tout est désactivable** : master switch `retail_sourcing_enabled` (défaut
+  **off**), flag par détaillant `retail_<code>_enabled`, et **mode dry-run**
+  `retail_dry_run` (défaut **on** : log les transitions sans alerter).
+- **Notifications** : une transition crée une ligne `alerts` (type `restock` /
+  `new_sku`) poussée par le dispatcher existant vers le canal Discord « restock »
+  **et** Telegram (chaque canal activable indépendamment). Dédup par transition
+  réelle + cooldown (`retail_restock_cooldown_min`).
+
+**Nouvelles tables** : `retailers` (seed Cultura/Fnac/Micromania), `retail_offers`
+(`product_id` nullable = hook scalping futur, `ON DELETE SET NULL`),
+`retail_stock_events`, `releases` (calendrier curé). Migration **additive et
+idempotente** (`CREATE TABLE IF NOT EXISTS`) ; rollback :
+`db/migrations/down_pokestock_fr.sql`.
+
+> ⚠️ **`sitemap_url` à confirmer au go-live.** Les URLs seedées sont best-effort :
+> vérifie chacune dans le `robots.txt` du site (`curl.exe https://www.cultura.com/robots.txt`)
+> et corrige-la dans l'écran **Détaillants** si besoin.
+
+**Jobs (panel + scheduler, verrou `job_runs`)** :
+
+```bash
+docker compose exec backend python -m app.cli  # ou via le panel « Actions & Jobs »
+# retail-check-restocks  : watchlist → fetch → transition → event + alerte
+# retail-detect-new-skus : sitemaps → diff → nouvelles offres (unknown) + alerte
+# retail-refresh-prices  : rafraîchit prix/état sans alerter
+```
+
+**Écrans** : *Veille restock* (offres watchées, ajout par URL), *Détaillants*
+(activation, compteurs d'erreurs / circuit breaker), *Calendrier* (CRUD releases).
+
+### Prérequis Telegram (@BotFather)
+
+1. Sur Telegram, parler à **@BotFather** → `/newbot` → récupérer le **token**.
+2. Récupérer le **chat_id** cible (envoyer un message au bot puis lire
+   `https://api.telegram.org/bot<token>/getUpdates`, ou via **@userinfobot**).
+3. Renseigner `TELEGRAM_BOT_TOKEN` / `TELEGRAM_CHAT_ID` dans `.env` (secrets, jamais
+   en base) et passer le setting `telegram_enabled=true`. Idem côté Discord :
+   `DISCORD_CHANNEL_RESTOCK`.
+
+### Deal Analyzer (indice de scalping — v1)
+
+Première brique du croisement **prix annoncé vs prix marché PokeTrace** :
+`POST /retail/analyze` (`app/services/deal_analyzer.py`) récupère une annonce par
+URL (parser JSON-LD/DOM réutilisé), recherche la carte/produit sur PokeTrace
+(`card_value` : UNOPENED scellé / NEAR_MINT single), convertit en EUR
+(`fx_usd_eur`) et calcule l'écart + un verdict (`STRONG BUY` … `OVERPRICED`).
+Écran dashboard **Deal Analyzer** (`/analyzer`). Une seule requête sortante par
+analyse (action manuelle). Le matching offre↔produit interne
+(`retail_offers.product_id`, FK nullable) reste manuel/best-effort ; pas de
+fuzzy-matching automatique persistant.
+
+### Frontend PokéAlpha (reskin)
+
+Le dashboard adopte le design **PokéAlpha** : 4 thèmes runtime (dark/light/holo/
+ember), polices Outfit + JetBrains Mono, sélecteur de thème et **bascule de langue
+FR/EN** (`src/i18n.jsx`, `src/ThemeContext.jsx`), landing publique (`/`), **Set
+Explorer / Set Detail** (`/explorer`, `/set/:slug`) et **Future Radar** (`/future`).
+
+### Future Radar — modèle ML (scikit-learn)
+
+`app/ml/` entraîne trois régressseurs *gradient boosting* (`scikit-learn`) qui
+prédisent **hype / popularité / ROI** d'une sortie à partir de features produit
+(type, mots-clés ETB/UPC/booster…, langue). Les **cibles sont dérivées de
+signaux réels** de `price_snapshots` : ROI = momentum prix (`avg_1d` vs `avg_30d`),
+popularité = `sale_count`, hype = volatilité (`high−low`/`avg`). La **confiance**
+combine la complétude des données de la sortie et la taille du jeu d'entraînement.
+Le modèle est persisté en base (`ml_models`, payload joblib, caché par
+`trained_at`) ; l'inférence remplace l'heuristique dès qu'un modèle existe, sinon
+**repli automatique sur l'heuristique** (`app/services/release_scoring.py`).
+(Ré)entraînement : job **`train-release-model`** (panel + hebdo scheduler) ;
+en-deçà de 12 échantillons, l'entraînement est sauté (`données insuffisantes`).
+Parité train/serve garantie (mêmes features). Upgradeable vers des modèles plus
+riches sans changer l'interface (`scores` : `{hype, confidence, popularity, roi,
+model}`).
+
+### Veille restock = acheter au MSRP (flip value)
+
+Le but d'un restock : un scellé redevient achetable au **prix officiel (~MSRP)** ;
+si la **valeur marché** est supérieure, c'est une opportunité d'achat-revente.
+`app/services/flip_value.py` croise `retail_offers.current_price` (MSRP) avec la
+valeur marché du produit lié (snapshots marché **possédés** en priorité, sinon
+PokeTrace) → **upside %** + verdict **STRONG BUY / BUY / FAIR / PASS**. Le matching
+(`retail_offers.product_id`) active ce signal ; une offre non liée reste alertée
+sans verdict. L'écran **Veille restock** affiche MSRP · marché · flip ; l'embed
+Discord/Telegram porte le verdict. Réglage `restock_min_flip_pct` : seul un flip
+≥ seuil déclenche l'**alerte instantanée** (les restocks sans marge partent au
+digest) → on n'est pingé que sur les vrais coups. Verdict **net de frais**
+(`resale_fee_pct`) — un +12% brut peut être nul après frais.
+
+### Flip Radar — où est l'argent maintenant
+
+L'écran **Flip Radar** (`/flip`, `app/services/flip_radar.py`) classe en continu
+les offres watchées **en stock** par **marge nette** (marché vs MSRP, frais
+déduits) : MSRP · marché · flip net % · profit estimé · verdict. Le job
+`flip-radar-scan` alerte **proactivement** au-delà de `flip_alert_min_pct` (ex.
+le marché monte sans changement de stock — invisible aux alertes de transition),
+avec dédup + cooldown. Marche sur les prix PokeTrace même sans le moat activé.
+
+### Moat de données marché + automatisation auto-supervisée
+
+On **possède son historique** : chaque jour on tire les prix scellés courants
+multi-sources et on les stocke en `market_price_snapshots` (un snapshot par
+`(product_ref, source, market, jour)` → idempotent). En quelques mois : série
+longitudinale propriétaire qui nourrit le modèle Future Radar.
+
+**Sources** (port unique `app/marketdata/`, interchangeables, OFF par défaut) :
+- **PokemonPriceTracker** (`ppt`) — prix scellés USD (TCGplayer) + EUR
+  (Cardmarket). Quota free 100 req/j → **watched-only** + cap/run (90<100). Clé :
+  `settings ppt_api_key` ou `.env PPT_API_KEY`.
+- **TCGdex** (`tcgdex`) — catalogue canonique FR + dates de sortie (gratuit, sans
+  clé). Sert au matching et à l'auto-calendrier.
+- **eBay Browse** (`ebay`) — annonces FR (OAuth) ; **agrégats dérivés uniquement**
+  (nb/min/médiane) pour respecter la rétention eBay. `ebay_client_id/secret`.
+
+**Tables** : `market_price_snapshots` (le moat), `data_quarantine` (prix rejetés
+par les garde-fous), `match_review` (matchs ambigus, basse priorité).
+
+**Jobs** (panel + scheduler, verrou `job_runs`) : `market-snapshot-daily`,
+`calendar-sync` (auto-remplit `releases`), `match-products` (offre↔produit :
+set+numéro → fuzzy, ≥ seuil auto, sinon `match_review` — rien ne bloque),
+`source-health-check`.
+
+**Automatisation auto-supervisée** — agressif sur le planning, léger sur les
+requêtes :
+- **Garde-fous d'ingestion** : bornes de sanité par `product_type`, cohérence
+  devise/marché, dédup, outlier vs médiane → rejet en `data_quarantine`.
+- **Footprint poli** : cap/run honorant les quotas, jitter, circuit breaker +
+  backoff sur 403/429 (réutilise `app/retail/politeness`).
+- **Hygiène d'alertes** : cooldown + **anti-flapping** (oscillation in/out ne
+  spamme pas) ; **digest quotidien** optionnel (`alert_digest_enabled`) pour les
+  events non urgents (nouveaux SKU, quarantaine, review).
+- **Moniteur santé** (`source-health-check`, le seul moment où tu interviens) :
+  pour chaque source, fraîcheur / erreurs / blocage / volume nul → alerte sur le
+  **canal santé** (`DISCORD_CHANNEL_HEALTH` + Telegram). Les sources OK = silence.
+
+**Settings clés** : `marketdata_enabled`, `marketdata_<source>_enabled`,
+`marketdata_request_cap_per_run_<source>`, `match_confidence_threshold`,
+`sanity_bounds_eur`, `alert_digest_enabled`, `source_health_*`. Rollback :
+`db/migrations/down_marketdata_moat.sql`.
+
 ## Sourcing & auto-watchlist
 
 - **Scraping auto désactivé par défaut** (`sourcing_scraping_enabled=false`) :
@@ -322,7 +477,7 @@ re-hache automatiquement.
 ## Vérifications (Definition of Done)
 
 ```bash
-# Base : 14 tables, 4 paliers, registre settings > 80
+# Base : 18 tables (14 socle + 4 PokéStock FR), 4 paliers, registre settings > 80
 docker compose exec db mysql -uroot -p"$DB_ROOT_PASSWORD" pokemon_arbitrage \
   -e "SELECT COUNT(*) AS settings FROM settings; SELECT COUNT(*) AS tiers FROM tiers_config;"
 

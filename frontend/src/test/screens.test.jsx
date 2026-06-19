@@ -19,15 +19,20 @@ vi.mock("../api.js", () => ({
   fetchMe: vi.fn(),
 }));
 
+import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "../AuthContext.jsx";
 import Cockpit from "../pages/Cockpit.jsx";
 import Settings from "../pages/Settings.jsx";
 import Jobs from "../pages/Jobs.jsx";
 import Sets from "../pages/Sets.jsx";
 import Watchlist from "../pages/Watchlist.jsx";
+import Restock from "../pages/Restock.jsx";
+import Retailers from "../pages/Retailers.jsx";
+import Calendar from "../pages/Calendar.jsx";
+import SetExplorer from "../pages/SetExplorer.jsx";
 import App from "../App.jsx";
 
-const wrap = (ui) => render(<AuthProvider>{ui}</AuthProvider>);
+const wrap = (ui) => render(<MemoryRouter><AuthProvider>{ui}</AuthProvider></MemoryRouter>);
 
 beforeEach(() => {
   h.post.mockClear();
@@ -70,8 +75,21 @@ describe("Settings — bascule Pro", () => {
 
 describe("Auth", () => {
   it("protège les routes : non connecté → écran de login", () => {
+    // "/" est la landing publique ; une route protégée redirige vers le login.
+    window.history.pushState({}, "", "/cockpit");
     render(<App />);
     expect(screen.getByText("Se connecter")).toBeInTheDocument();
+    window.history.pushState({}, "", "/");
+  });
+});
+
+describe("Landing", () => {
+  it("affiche la landing publique sur /", () => {
+    window.history.pushState({}, "", "/");
+    render(<App />);
+    // Langue par défaut FR.
+    expect(screen.getByText("Lancer l'app")).toBeInTheDocument();
+    expect(screen.getByText("Explorer le marché")).toBeInTheDocument();
   });
 });
 
@@ -123,6 +141,71 @@ describe("Sets — ajout d'un set cible", () => {
     fireEvent.click(screen.getByText("Ajouter"));
     await waitFor(() => expect(h.post).toHaveBeenCalled());
     expect(h.post.mock.calls[0][1]).toBe("/tracked-sets");
+  });
+});
+
+describe("PokéStock FR — Veille restock", () => {
+  it("affiche les offres watchées et ajoute une offre par URL", async () => {
+    h.polled["/retail/offers?watched=true"] = [
+      { id: 1, title: "ETB Pokémon", retailer: "Cultura", stock_state: "in_stock",
+        price: 59.99, url: "https://c/p/etb.html", last_changed_at: "2026-06-16T10:00:00" },
+    ];
+    wrap(<Restock />);
+    expect(screen.getByText("ETB Pokémon")).toBeInTheDocument();
+    expect(screen.getByText("✅ En stock")).toBeInTheDocument();
+
+    fireEvent.change(screen.getByPlaceholderText(/cultura\.com/i), {
+      target: { value: "https://www.cultura.com/p/x.html" },
+    });
+    fireEvent.click(screen.getByText("Ajouter à la veille"));
+    await waitFor(() => expect(h.post).toHaveBeenCalled());
+    expect(h.post.mock.calls[0][1]).toBe("/retail/offers");
+  });
+});
+
+describe("PokéStock FR — Détaillants", () => {
+  it("affiche le circuit breaker et bascule l'activation", async () => {
+    h.polled["/retail/retailers"] = [
+      { id: 1, code: "fnac", name: "Fnac", enabled: false, offers: 3,
+        error_count: 5, circuit_open: true, is_active: true },
+    ];
+    wrap(<Retailers />);
+    expect(screen.getByText("Fnac")).toBeInTheDocument();
+    expect(screen.getByText(/ouvert \(5 err\)/)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByText("ON"));
+    await waitFor(() => expect(h.put).toHaveBeenCalled());
+    expect(h.put.mock.calls[0][1]).toBe("/retail/retailers/1");
+  });
+});
+
+describe("PokéStock FR — Calendrier", () => {
+  it("valide le nom requis puis POST une sortie", async () => {
+    h.polled["/releases"] = [];
+    wrap(<Calendar />);
+    fireEvent.click(screen.getByText("Ajouter"));
+    expect(screen.getByText(/nom du produit est requis/i)).toBeInTheDocument();
+    expect(h.post).not.toHaveBeenCalled();
+
+    fireEvent.change(screen.getByLabelText(/^Produit/i), { target: { value: "ETB Prismatic" } });
+    fireEvent.click(screen.getByText("Ajouter"));
+    await waitFor(() => expect(h.post).toHaveBeenCalled());
+    expect(h.post.mock.calls[0][1]).toBe("/releases");
+  });
+});
+
+describe("Set Explorer", () => {
+  it("affiche les sets suivis avec le nombre de movers", () => {
+    h.polled["/tracked-sets"] = [
+      { id: 1, name: "Prismatic Evolutions", set_slug: "prismatic-evolutions", is_active: true },
+    ];
+    h.polled["/movers"] = [
+      { product_id: 9, name: "Umbreon ex", set_slug: "prismatic-evolutions", rise_pct: 12.5, price: 1400 },
+    ];
+    wrap(<SetExplorer />);
+    expect(screen.getByText("Prismatic Evolutions")).toBeInTheDocument();
+    expect(screen.getByText("prismatic-evolutions")).toBeInTheDocument();
+    expect(screen.getByText("1")).toBeInTheDocument(); // 1 mover
   });
 });
 
