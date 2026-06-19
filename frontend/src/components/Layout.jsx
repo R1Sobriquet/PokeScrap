@@ -111,6 +111,7 @@ const NAV_GROUPS = [
       { to: "/analyzer", key: "nav.analyzer" },
       { to: "/watchlist", key: "nav.watchlist" },
       { to: "/restock", key: "nav.restock" },
+      { to: "/flip", key: "nav.flip" },
       { to: "/detaillants", key: "nav.detaillants" },
       { to: "/calendrier", key: "nav.calendrier" },
     ],

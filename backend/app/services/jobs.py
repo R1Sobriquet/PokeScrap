@@ -99,6 +99,12 @@ def _run_source_health_check(db: Session) -> dict:
     return check_sources(db)
 
 
+def _run_flip_radar(db: Session) -> dict:
+    from app.services.flip_radar import run_flip_radar
+
+    return run_flip_radar(db)
+
+
 JOBS = {
     "sync-tracked-sets": _run_sync_tracked_sets,
     "refresh-prices": _run_refresh_prices,
@@ -117,6 +123,7 @@ JOBS = {
     "calendar-sync": _run_calendar_sync,
     "match-products": _run_match_products,
     "source-health-check": _run_source_health_check,
+    "flip-radar-scan": _run_flip_radar,
 }
 
 

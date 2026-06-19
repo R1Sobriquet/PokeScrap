@@ -16,6 +16,7 @@ import Ledger from "./pages/Ledger.jsx";
 import Grading from "./pages/Grading.jsx";
 import Jobs from "./pages/Jobs.jsx";
 import Restock from "./pages/Restock.jsx";
+import FlipRadar from "./pages/FlipRadar.jsx";
 import Retailers from "./pages/Retailers.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import FutureRadar from "./pages/FutureRadar.jsx";
@@ -51,6 +52,7 @@ export default function App() {
             <Route path="/ledger" element={<Ledger />} />
             <Route path="/grading" element={<Grading />} />
             <Route path="/restock" element={<Restock />} />
+            <Route path="/flip" element={<FlipRadar />} />
             <Route path="/detaillants" element={<Retailers />} />
             <Route path="/calendrier" element={<Calendar />} />
             <Route path="/future" element={<FutureRadar />} />

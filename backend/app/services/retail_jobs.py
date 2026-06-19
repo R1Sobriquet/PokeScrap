@@ -134,6 +134,7 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
     cooldown_cap = int(get_setting("scrape_blocked_cooldown_min", default=120))
     # Flip value (acheter au MSRP) — lus une fois (pas de get_setting après flush).
     min_flip = float(get_setting("restock_min_flip_pct", default=0))
+    fee_pct = float(get_setting("resale_fee_pct", default=12))
     fx = float(get_setting("fx_usd_eur", default=0.92))
     market = str(get_setting("valuation_market", default="US"))
 
@@ -186,7 +187,7 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
             if is_restock:
                 stats["transitions"] += 1
                 # Flip value AVANT l'ajout de l'event (aucun flush en attente).
-                flip = flip_for_offer(db, offer, fx=fx, market=market)
+                flip = flip_for_offer(db, offer, fx=fx, market=market, fee_pct=fee_pct)
                 db.add(RetailStockEvent(
                     offer_id=offer.id, from_state=prev_state,
                     to_state=offer.current_stock_state, price=offer.current_price,
@@ -195,7 +196,7 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
                 offer.last_changed_at = now
                 # Ping instantané seulement si flip ≥ seuil (sinon digest) ;
                 # non matché / sans valeur marché → instantané (décision humaine).
-                low_flip = flip["upside_pct"] is not None and flip["upside_pct"] < min_flip
+                low_flip = flip["net_upside_pct"] is not None and flip["net_upside_pct"] < min_flip
                 severity = "info" if low_flip else "warning"
                 if (alert and not dry and not _recent_restock(db, offer.id, cooldown, now)
                         and not _is_flapping(db, offer.id, debounce, now)):

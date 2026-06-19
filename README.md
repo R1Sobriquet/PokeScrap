@@ -144,7 +144,17 @@ PokeTrace) → **upside %** + verdict **STRONG BUY / BUY / FAIR / PASS**. Le mat
 sans verdict. L'écran **Veille restock** affiche MSRP · marché · flip ; l'embed
 Discord/Telegram porte le verdict. Réglage `restock_min_flip_pct` : seul un flip
 ≥ seuil déclenche l'**alerte instantanée** (les restocks sans marge partent au
-digest) → on n'est pingé que sur les vrais coups.
+digest) → on n'est pingé que sur les vrais coups. Verdict **net de frais**
+(`resale_fee_pct`) — un +12% brut peut être nul après frais.
+
+### Flip Radar — où est l'argent maintenant
+
+L'écran **Flip Radar** (`/flip`, `app/services/flip_radar.py`) classe en continu
+les offres watchées **en stock** par **marge nette** (marché vs MSRP, frais
+déduits) : MSRP · marché · flip net % · profit estimé · verdict. Le job
+`flip-radar-scan` alerte **proactivement** au-delà de `flip_alert_min_pct` (ex.
+le marché monte sans changement de stock — invisible aux alertes de transition),
+avec dédup + cooldown. Marche sur les prix PokeTrace même sans le moat activé.
 
 ### Moat de données marché + automatisation auto-supervisée
 

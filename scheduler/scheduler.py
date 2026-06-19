@@ -188,6 +188,16 @@ def source_health_check() -> None:
     logger.info("source_health_check: %s", result.get("summary"))
 
 
+def flip_radar_scan() -> None:
+    # Flip Radar : opportunités d'achat-revente en stock (no-op si dry-run).
+    from app.services.flip_radar import run_flip_radar
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_flip_radar(db)
+    logger.info("flip_radar_scan: %s", result.get("summary"))
+
+
 def main() -> None:
     scheduler = BlockingScheduler(timezone=TIMEZONE)
     scheduler.add_job(heartbeat, "interval", minutes=1, id="heartbeat")
@@ -240,6 +250,7 @@ def main() -> None:
     scheduler.add_job(calendar_sync, CronTrigger(hour=4, minute=40, timezone=TIMEZONE), id="calendar_sync")
     scheduler.add_job(match_products, CronTrigger(hour=5, minute=20, timezone=TIMEZONE), id="match_products")
     scheduler.add_job(source_health_check, "interval", hours=2, id="source_health_check")
+    scheduler.add_job(flip_radar_scan, "interval", hours=3, id="flip_radar_scan")
     logger.info(
         "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly, deadman=30m).",
         TIMEZONE,

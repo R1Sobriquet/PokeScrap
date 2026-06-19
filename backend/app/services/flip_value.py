@@ -60,19 +60,25 @@ def market_value_eur(db: Session, product_id: int, *, fx: float, market: str) ->
     return None, None
 
 
-def flip_for_offer(db: Session, offer, *, fx: float, market: str) -> dict:
-    """Calcule le flip d'une offre. Champs ``None`` si non calculable (non matchée
-    ou pas de valeur marché) — l'alerte reste émise, sans verdict."""
+def flip_for_offer(db: Session, offer, *, fx: float, market: str, fee_pct: float = 12.0) -> dict:
+    """Calcule le flip d'une offre (net des frais de revente). Champs ``None`` si
+    non calculable (non matchée ou pas de valeur marché) — l'alerte reste émise,
+    sans verdict. Le **verdict porte sur le NET** (honnêteté : un +12% brut peut
+    être nul après frais)."""
     retail = float(offer.current_price) if offer.current_price is not None else None
     out = {"retail_price": retail, "market_value": None, "market_source": None,
-           "upside_pct": None, "verdict": None, "verdict_tone": None}
+           "upside_pct": None, "net_upside_pct": None, "est_profit": None,
+           "verdict": None, "verdict_tone": None}
     if offer.product_id is None or retail is None or retail <= 0:
         return out
     mv, src = market_value_eur(db, offer.product_id, fx=fx, market=market)
     if mv is None:
         return out
-    upside = round((mv - retail) / retail * 100, 1)
-    label, tone = flip_verdict(upside)
+    upside = round((mv - retail) / retail * 100, 1)              # brut (transparence)
+    net_market = mv * (1 - max(0.0, fee_pct) / 100.0)
+    net_upside = round((net_market - retail) / retail * 100, 1)  # net de frais
+    label, tone = flip_verdict(net_upside)
     out.update({"market_value": mv, "market_source": src, "upside_pct": upside,
+                "net_upside_pct": net_upside, "est_profit": round(net_market - retail, 2),
                 "verdict": label, "verdict_tone": tone})
     return out

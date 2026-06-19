@@ -385,6 +385,14 @@ def _offer_dict(o: RetailOffer, retailer_name: str | None = None, flip: dict | N
     }
 
 
+@router.get("/retail/opportunities")
+def retail_opportunities(in_stock: bool = True, db: Session = Depends(get_db)) -> list[dict]:
+    """Flip Radar : offres watchées classées par flip net (marché vs MSRP)."""
+    from app.services.flip_radar import scan_opportunities
+
+    return scan_opportunities(db, in_stock_only=in_stock)
+
+
 @router.get("/retail/offers")
 def list_offers(watched: bool = True, db: Session = Depends(get_db)) -> list[dict]:
     from app.services.flip_value import flip_for_offer
