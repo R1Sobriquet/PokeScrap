@@ -27,6 +27,7 @@ from app.retail import sitemap as sm
 from app.retail.domain import RESTOCK_FROM, RESTOCK_TO, Retailer as RetailerDC
 from app.retail.fetch import HttpGet, HttpRetailSource, RetailBlocked, httpx_get
 from app.scraping.antibot import classify_block
+from app.services.flip_value import flip_for_offer
 
 logger = logging.getLogger("services.retail_jobs")
 
@@ -55,8 +56,11 @@ def _sourcing_off() -> bool:
 
 
 def create_retail_alert(db: Session, *, kind: str, offer: RetailOffer, retailer_name: str,
-                        severity: str = "warning") -> Alert:
-    """Crée une alerte pending (type ``restock``/``new_sku``) pour le dispatcher."""
+                        severity: str = "warning", extra: dict | None = None) -> Alert:
+    """Crée une alerte pending (type ``restock``/``new_sku``) pour le dispatcher.
+
+    ``extra`` : enrichissements (ex. flip value : valeur marché, upside, verdict).
+    """
     alert_type = "restock" if kind == "RESTOCK" else "new_sku"
     price = float(offer.current_price) if offer.current_price is not None else None
     label = "De retour en stock" if kind == "RESTOCK" else "Nouveau produit détecté"
@@ -70,6 +74,8 @@ def create_retail_alert(db: Session, *, kind: str, offer: RetailOffer, retailer_
         "offer_id": offer.id,
         "message": f"{label} chez {retailer_name}.",
     }
+    if extra:
+        payload.update({k: v for k, v in extra.items() if v is not None})
     # severity décidée par l'appelant AVANT tout flush (un get_setting ici, après
     # un flush, romprait la transaction sur StaticPool en test). Restock = urgent.
     alert = Alert(
@@ -126,6 +132,10 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
     debounce = int(get_setting("restock_debounce_min", default=30))
     max_err = int(get_setting("retail_circuit_max_errors", default=5))
     cooldown_cap = int(get_setting("scrape_blocked_cooldown_min", default=120))
+    # Flip value (acheter au MSRP) — lus une fois (pas de get_setting après flush).
+    min_flip = float(get_setting("restock_min_flip_pct", default=0))
+    fx = float(get_setting("fx_usd_eur", default=0.92))
+    market = str(get_setting("valuation_market", default="US"))
 
     budget = politeness.RequestBudget(cap)
     now = _utcnow()
@@ -175,16 +185,23 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
             )
             if is_restock:
                 stats["transitions"] += 1
+                # Flip value AVANT l'ajout de l'event (aucun flush en attente).
+                flip = flip_for_offer(db, offer, fx=fx, market=market)
                 db.add(RetailStockEvent(
                     offer_id=offer.id, from_state=prev_state,
                     to_state=offer.current_stock_state, price=offer.current_price,
                     detected_at=now,
                 ))
                 offer.last_changed_at = now
+                # Ping instantané seulement si flip ≥ seuil (sinon digest) ;
+                # non matché / sans valeur marché → instantané (décision humaine).
+                low_flip = flip["upside_pct"] is not None and flip["upside_pct"] < min_flip
+                severity = "info" if low_flip else "warning"
                 if (alert and not dry and not _recent_restock(db, offer.id, cooldown, now)
                         and not _is_flapping(db, offer.id, debounce, now)):
                     db.flush()  # garantit offer.id pour le payload
-                    create_retail_alert(db, kind="RESTOCK", offer=offer, retailer_name=retailer.name)
+                    create_retail_alert(db, kind="RESTOCK", offer=offer,
+                                        retailer_name=retailer.name, severity=severity, extra=flip)
                     stats["alerts"] += 1
             elif transitioned:
                 db.add(RetailStockEvent(

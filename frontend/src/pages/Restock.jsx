@@ -15,6 +15,14 @@ const STATE = {
   unknown: { color: "var(--muted2)", bg: "var(--panel2)" },
 };
 
+const FLIP_TONE = {
+  buy: { color: "var(--green-text)", bg: "rgba(52,211,153,.12)" },
+  fair: { color: "var(--blue-soft)", bg: "rgba(61,123,255,.1)" },
+  pass: { color: "var(--red-text)", bg: "rgba(244,88,95,.1)" },
+};
+
+const GRID = "minmax(0,1fr) 88px 116px 72px 78px 112px 60px";
+
 function host(url) {
   try {
     return new URL(url).host.replace(/^www\./, "");
@@ -123,13 +131,14 @@ export default function Restock() {
         {/* column header */}
         <div
           className="grid items-center gap-2.5 border-b px-4 py-2.5 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500"
-          style={{ borderColor: "var(--line)", gridTemplateColumns: "minmax(0,1fr) 92px 130px 80px 100px 70px" }}
+          style={{ borderColor: "var(--line)", gridTemplateColumns: GRID }}
         >
           <div>{t("restock.col.product")}</div>
           <div>{t("restock.col.retailer")}</div>
           <div>{t("restock.col.state")}</div>
           <div className="text-right">{t("restock.col.price")}</div>
-          <div>{t("restock.col.alerts")}</div>
+          <div className="text-right">{t("restock.col.market")}</div>
+          <div>{t("restock.col.flip")}</div>
           <div className="text-right">{t("restock.col.changed")}</div>
         </div>
 
@@ -138,11 +147,12 @@ export default function Restock() {
         ) : (
           list.map((o) => {
             const st = STATE[o.stock_state] || STATE.unknown;
+            const ft = FLIP_TONE[o.verdict_tone];
             return (
               <div
                 key={o.id}
                 className="grid items-center gap-2.5 border-b px-4 py-3.5"
-                style={{ borderColor: "var(--line)", gridTemplateColumns: "minmax(0,1fr) 92px 130px 80px 100px 70px" }}
+                style={{ borderColor: "var(--line)", gridTemplateColumns: GRID }}
               >
                 <div className="flex min-w-0 items-center gap-2.5">
                   <ProductImage src={o.image_url} alt={o.title || o.url} seed={o.retailer}
@@ -166,9 +176,20 @@ export default function Restock() {
                   </span>
                 </div>
                 <div className="text-right font-mono text-[13px] font-semibold">{eur(o.price)}</div>
-                <div className="flex gap-1">
-                  <span className="rounded font-mono text-[9px] font-semibold" style={{ padding: "3px 5px", color: "#C7CBFF", background: "rgba(88,101,242,.16)" }}>DISCORD</span>
-                  <span className="rounded font-mono text-[9px] font-semibold" style={{ padding: "3px 5px", color: "#AEE0FF", background: "rgba(41,169,235,.16)" }}>TG</span>
+                <div className="text-right font-mono text-[12px] text-slate-400">
+                  {o.market_value != null ? eur(o.market_value) : "—"}
+                </div>
+                <div>
+                  {o.verdict ? (
+                    <span className="inline-flex items-center gap-1 rounded-md px-2 py-1 font-mono text-[10.5px] font-bold" style={{ color: ft?.color, background: ft?.bg }}>
+                      {o.verdict}
+                      {o.upside_pct != null && (
+                        <span className="font-normal">{o.upside_pct >= 0 ? "+" : ""}{o.upside_pct}%</span>
+                      )}
+                    </span>
+                  ) : (
+                    <span className="font-mono text-[10px] text-slate-600">— non lié</span>
+                  )}
                 </div>
                 <div className="text-right font-mono text-[10.5px] text-slate-600">
                   {(o.last_changed_at || o.last_checked_at || "").replace("T", " ").slice(5, 16) || "—"}

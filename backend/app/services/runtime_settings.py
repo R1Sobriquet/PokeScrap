@@ -53,6 +53,7 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("retail_min_delay_ms", "3000", "int", "Délai min (ms) entre deux requêtes vers un même détaillant"),
     ("retail_restock_cooldown_min", "360", "int", "Cooldown (min) avant ré-alerte sur une même offre"),
     ("retail_circuit_max_errors", "5", "int", "Erreurs consécutives avant circuit breaker d'un détaillant"),
+    ("restock_min_flip_pct", "0", "decimal", "Restock : alerte instantanée seulement si upside (marché vs MSRP) ≥ N% (sinon digest)"),
     ("telegram_enabled", "false", "bool", "Active les notifications Telegram (token/chat_id dans .env)"),
     # Moat de données marché — multi-sources (défauts prudents : tout OFF, watched-only)
     ("marketdata_enabled", "false", "bool", "Master switch du moat de données marché"),

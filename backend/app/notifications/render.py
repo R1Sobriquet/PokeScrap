@@ -147,8 +147,19 @@ def _retail_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ..
     fields = [
         EmbedField("Enseigne", str(payload.get("retailer", "—"))),
         EmbedField("État", _STOCK_BADGE.get(state, state or "—")),
-        EmbedField("Prix", f"{_money(price)} {currency}" if price is not None else "—"),
+        EmbedField("Prix (MSRP)", f"{_money(price)} {currency}" if price is not None else "—"),
     ]
+    # Flip value : acheter au MSRP, revendre au marché.
+    verdict = payload.get("verdict")
+    if verdict is not None:
+        mv = payload.get("market_value")
+        upside = payload.get("upside_pct")
+        tone_icon = {"buy": "🟢", "fair": "🔵", "pass": "🔴"}.get(payload.get("verdict_tone"), "")
+        fields.append(EmbedField("Valeur marché", f"{_money(mv)} {currency}" if mv is not None else "—"))
+        fields.append(EmbedField(
+            "Flip",
+            f"{tone_icon} {verdict}" + (f" ({'+' if (upside or 0) >= 0 else ''}{upside}%)" if upside is not None else ""),
+        ))
     icon = "🆕" if is_new else "🔔"
     label = "Nouveau SKU" if is_new else "Restock"
     embed = EmbedSpec(

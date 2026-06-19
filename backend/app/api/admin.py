@@ -371,26 +371,33 @@ def update_retailer(retailer_id: int, payload: RetailerUpdate, db: Session = Dep
     return _retailer_dict(r, db)
 
 
-def _offer_dict(o: RetailOffer, retailer_name: str | None = None) -> dict:
+def _offer_dict(o: RetailOffer, retailer_name: str | None = None, flip: dict | None = None) -> dict:
     return {
         "id": o.id, "retailer_id": o.retailer_id, "retailer": retailer_name,
         "url": o.url, "title": o.title, "image_url": o.image_url, "product_type": o.product_type,
         "stock_state": o.current_stock_state,
         "price": float(o.current_price) if o.current_price is not None else None,
         "currency": o.currency, "is_watched": bool(o.is_watched),
+        "product_id": o.product_id,
         "last_checked_at": o.last_checked_at.isoformat() if o.last_checked_at else None,
         "last_changed_at": o.last_changed_at.isoformat() if o.last_changed_at else None,
+        **(flip or {}),
     }
 
 
 @router.get("/retail/offers")
 def list_offers(watched: bool = True, db: Session = Depends(get_db)) -> list[dict]:
+    from app.services.flip_value import flip_for_offer
+
     names = {r.id: r.name for r in db.scalars(select(Retailer)).all()}
+    fx = float(get_setting("fx_usd_eur", default=0.92))
+    market = str(get_setting("valuation_market", default="US"))
     stmt = select(RetailOffer)
     if watched:
         stmt = stmt.where(RetailOffer.is_watched == 1)
     stmt = stmt.order_by(RetailOffer.last_changed_at.desc().nullslast(), RetailOffer.id.desc())
-    return [_offer_dict(o, names.get(o.retailer_id)) for o in db.scalars(stmt).all()]
+    return [_offer_dict(o, names.get(o.retailer_id), flip_for_offer(db, o, fx=fx, market=market))
+            for o in db.scalars(stmt).all()]
 
 
 class OfferWatchUpdate(BaseModel):

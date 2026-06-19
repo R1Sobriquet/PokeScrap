@@ -133,6 +133,19 @@ Parité train/serve garantie (mêmes features). Upgradeable vers des modèles pl
 riches sans changer l'interface (`scores` : `{hype, confidence, popularity, roi,
 model}`).
 
+### Veille restock = acheter au MSRP (flip value)
+
+Le but d'un restock : un scellé redevient achetable au **prix officiel (~MSRP)** ;
+si la **valeur marché** est supérieure, c'est une opportunité d'achat-revente.
+`app/services/flip_value.py` croise `retail_offers.current_price` (MSRP) avec la
+valeur marché du produit lié (snapshots marché **possédés** en priorité, sinon
+PokeTrace) → **upside %** + verdict **STRONG BUY / BUY / FAIR / PASS**. Le matching
+(`retail_offers.product_id`) active ce signal ; une offre non liée reste alertée
+sans verdict. L'écran **Veille restock** affiche MSRP · marché · flip ; l'embed
+Discord/Telegram porte le verdict. Réglage `restock_min_flip_pct` : seul un flip
+≥ seuil déclenche l'**alerte instantanée** (les restocks sans marge partent au
+digest) → on n'est pingé que sur les vrais coups.
+
 ### Moat de données marché + automatisation auto-supervisée
 
 On **possède son historique** : chaque jour on tire les prix scellés courants
