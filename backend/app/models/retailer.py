@@ -27,6 +27,10 @@ class Retailer(Base):
     availability_url_template: Mapped[str | None] = mapped_column(String(512), nullable=True)
     # Phase B — endpoint XHR de dispo MAGASIN ; placeholders {sku} {store_code} {url}.
     store_availability_url_template: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    # Phase C — achat assisté : endpoint d'ajout panier + lien panier/checkout.
+    # NULL ⇒ pas de carting (deep-link produit seulement). Aucun paiement automatisé.
+    cart_add_url_template: Mapped[str | None] = mapped_column(String(512), nullable=True)
+    cart_view_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     is_active: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     created_at: Mapped[dt.datetime] = mapped_column(
         DateTime, server_default=func.current_timestamp()

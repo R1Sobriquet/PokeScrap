@@ -67,6 +67,9 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("retail_store_stock_enabled", "false", "bool", "Active la veille dispo en magasin (sous retail_sourcing_enabled)"),
     ("retail_store_check_interval_min", "60", "int", "Intervalle min (min) entre deux checks d'un (offre,magasin)"),
     ("retail_store_request_cap_per_run", "30", "int", "Plafond de requêtes par run du job dispo magasin"),
+    # Phase C — achat ASSISTÉ (jamais de paiement auto ; l'humain finalise + 3DS).
+    ("assisted_buy_enabled", "false", "bool", "Kill-switch global de l'achat assisté (OFF par défaut)"),
+    ("assisted_buy_dry_run", "true", "bool", "Dry-run : simule le panier + alerte, sans carter réellement"),
     ("telegram_enabled", "false", "bool", "Active les notifications Telegram (token/chat_id dans .env)"),
     # Moat de données marché — multi-sources (défauts prudents : tout OFF, watched-only)
     ("marketdata_enabled", "false", "bool", "Master switch du moat de données marché"),

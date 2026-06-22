@@ -15,6 +15,8 @@ from app.auth.security import get_current_user
 from app.config import get_setting, invalidate_setting
 from app.db import get_db
 from app.models import (
+    BuyAttempt,
+    BuyRule,
     OfferStoreAvailability,
     Release,
     RetailOffer,
@@ -477,6 +479,98 @@ def update_store(store_id: int, payload: StoreUpdate, db: Session = Depends(get_
     s.is_watched = 1 if payload.is_watched else 0
     db.commit()
     return {"id": store_id, "is_watched": bool(s.is_watched), "status": "ok"}
+
+
+# --------------------------------------------------- Phase C : achat assisté
+def _rule_dict(r: BuyRule) -> dict:
+    return {
+        "id": r.id, "scope": r.scope, "scope_value": r.scope_value,
+        "retailer_id": r.retailer_id, "max_price": float(r.max_price),
+        "max_quantity": r.max_quantity, "is_enabled": bool(r.is_enabled),
+    }
+
+
+@router.get("/buy-rules")
+def list_buy_rules(db: Session = Depends(get_db)) -> list[dict]:
+    return [_rule_dict(r) for r in db.scalars(select(BuyRule).order_by(BuyRule.id.desc())).all()]
+
+
+class BuyRuleIn(BaseModel):
+    scope: str = "offer"
+    scope_value: str
+    retailer_id: int | None = None
+    max_price: float
+    max_quantity: int = 1
+    is_enabled: bool = False
+
+
+@router.post("/buy-rules")
+def create_buy_rule(payload: BuyRuleIn, db: Session = Depends(get_db)) -> dict:
+    if payload.scope not in ("offer", "product_type"):
+        raise HTTPException(status_code=400, detail="scope invalide (offer|product_type)")
+    if payload.max_price <= 0 or payload.max_quantity < 1:
+        raise HTTPException(status_code=400, detail="Plafond prix > 0 et quantité ≥ 1 requis")
+    r = BuyRule(scope=payload.scope, scope_value=str(payload.scope_value).strip(),
+                retailer_id=payload.retailer_id, max_price=payload.max_price,
+                max_quantity=payload.max_quantity, is_enabled=1 if payload.is_enabled else 0)
+    db.add(r)
+    db.commit()
+    return _rule_dict(r)
+
+
+class BuyRuleUpdate(BaseModel):
+    max_price: float | None = None
+    max_quantity: int | None = None
+    is_enabled: bool | None = None
+
+
+@router.put("/buy-rules/{rule_id}")
+def update_buy_rule(rule_id: int, payload: BuyRuleUpdate, db: Session = Depends(get_db)) -> dict:
+    r = db.get(BuyRule, rule_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Règle inconnue")
+    if payload.max_price is not None:
+        if payload.max_price <= 0:
+            raise HTTPException(status_code=400, detail="Plafond prix > 0 requis")
+        r.max_price = payload.max_price
+    if payload.max_quantity is not None:
+        r.max_quantity = max(1, payload.max_quantity)
+    if payload.is_enabled is not None:
+        r.is_enabled = 1 if payload.is_enabled else 0
+    db.commit()
+    return _rule_dict(r)
+
+
+@router.delete("/buy-rules/{rule_id}")
+def delete_buy_rule(rule_id: int, db: Session = Depends(get_db)) -> dict:
+    r = db.get(BuyRule, rule_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Règle inconnue")
+    db.delete(r)
+    db.commit()
+    return {"id": rule_id, "status": "deleted"}
+
+
+@router.get("/buy-attempts")
+def list_buy_attempts(db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(select(BuyAttempt).order_by(BuyAttempt.id.desc()).limit(100)).all()
+    return [{
+        "id": a.id, "offer_id": a.offer_id, "channel": a.channel, "status": a.status,
+        "cart_url": a.cart_url, "reason": a.reason,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    } for a in rows]
+
+
+@router.post("/retail/offers/{offer_id}/buy")
+def assisted_buy_now(offer_id: int, db: Session = Depends(get_db)) -> dict:
+    """Déclenche l'achat ASSISTÉ d'une offre (allow-list + garde-fous). Jamais de paiement."""
+    from app.services.assisted_buy import attempt_buy
+
+    offer = db.get(RetailOffer, offer_id)
+    if offer is None:
+        raise HTTPException(status_code=404, detail="Offre inconnue")
+    retailer = db.get(Retailer, offer.retailer_id)
+    return attempt_buy(db, offer=offer, retailer=retailer)
 
 
 @router.get("/retail/store-availability")

@@ -114,6 +114,7 @@ const NAV_GROUPS = [
       { to: "/flip", key: "nav.flip" },
       { to: "/detaillants", key: "nav.detaillants" },
       { to: "/magasins", key: "nav.magasins" },
+      { to: "/achat-assiste", key: "nav.buyrules" },
       { to: "/calendrier", key: "nav.calendrier" },
     ],
   },

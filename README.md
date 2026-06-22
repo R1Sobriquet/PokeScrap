@@ -198,6 +198,28 @@ Marmande, La Meeple'rie Villeneuve — Facebook/Instagram uniquement.
 **Honnêteté** : la dispo magasin est **retardée et approximative** (le site peut
 dire « dispo » alors que le rayon est vide, et l'inverse) — c'est un indice.
 
+### Phase C — achat ASSISTÉ (jamais automatique)
+
+But : réduire le temps de réaction à quelques secondes. Sur une alerte restock
+d'une offre matchant une `buy_rule` active → **ajout au panier** (sur la session
+connectée de l'utilisateur, cookie en `settings assisted_buy_cookie_<code>`) +
+**deep-link** vers le panier pré-rempli, poussé en alerte « 🛒 Ajouté au panier —
+finalise ici · TU fais le paiement + 3DS ». Audit dans `buy_attempts`.
+
+**Non-objectifs (jamais implémentés, cadrés en dur) :** ❌ paiement automatique
+❌ contournement 3-D Secure / SCA ❌ stockage de moyens de paiement ❌
+contournement anti-bot au checkout. **L'humain finalise toujours le paiement.**
+
+Garde-fous (`app/services/assisted_buy.py`) : **kill-switch** global
+(`assisted_buy_enabled`), **allow-list** (`buy_rules` — rien hors règle active),
+**plafond prix** (anti-scalp : prix gonflé → on ne carte PAS) + **cap quantité**,
+**dry-run** (`assisted_buy_dry_run` : simule + alerte sans carter), **idempotence**
+(pas de double-panier), **audit** complet. Carting bloqué (anti-bot, ex. Fnac) →
+**dégrade en deep-link produit** (`status=blocked`), jamais d'acharnement. Endpoint
+de carting (`retailers.cart_add_url_template`/`cart_view_url`) + session à fournir
+par l'utilisateur ; absents ⇒ deep-link seulement. Écran **Achat assisté** (règles
++ toggles kill-switch/dry-run + journal d'audit).
+
 ### Flip Radar — où est l'argent maintenant
 
 L'écran **Flip Radar** (`/flip`, `app/services/flip_radar.py`) classe en continu

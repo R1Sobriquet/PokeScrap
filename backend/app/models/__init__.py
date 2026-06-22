@@ -6,6 +6,8 @@ tables exploitées par les jalons en cours (le reste viendra au fil des jalons).
 
 from app.models.account_snapshot import AccountSnapshot
 from app.models.alert import Alert
+from app.models.buy_attempt import BuyAttempt
+from app.models.buy_rule import BuyRule
 from app.models.grading_opportunity import GradingOpportunity
 from app.models.job_run import JobRun
 from app.models.data_quarantine import DataQuarantine
@@ -34,6 +36,8 @@ from app.models.watchlist import Watchlist
 __all__ = [
     "AccountSnapshot",
     "Alert",
+    "BuyAttempt",
+    "BuyRule",
     "DataQuarantine",
     "GradingOpportunity",
     "JobRun",

@@ -275,6 +275,38 @@ SELECT r.id, s.store_code, s.name, s.city, s.postal, s.is_watched FROM (
 """
 
 
+_BUY_RULES_DDL = """
+CREATE TABLE IF NOT EXISTS buy_rules (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    scope        ENUM('offer','product_type') NOT NULL,
+    scope_value  VARCHAR(64)  NOT NULL,
+    retailer_id  BIGINT UNSIGNED NULL,
+    max_price    DECIMAL(8,2) NOT NULL,
+    max_quantity INT          NOT NULL DEFAULT 1,
+    is_enabled   TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_buy_rule_scope (scope, scope_value),
+    CONSTRAINT fk_buyrule_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_BUY_ATTEMPTS_DDL = """
+CREATE TABLE IF NOT EXISTS buy_attempts (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    offer_id   BIGINT UNSIGNED NOT NULL,
+    channel    ENUM('online','store') NOT NULL DEFAULT 'online',
+    status     ENUM('carted','blocked','skipped','dry_run') NOT NULL,
+    cart_url   VARCHAR(512) NULL,
+    reason     VARCHAR(128) NULL,
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_buy_attempt_offer (offer_id, created_at),
+    CONSTRAINT fk_buyattempt_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+
 def ensure_schema_upgrades(engine: Engine) -> None:
     """Applique les upgrades manquants (MySQL uniquement)."""
     if engine.dialect.name != "mysql":
@@ -375,3 +407,11 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                  "ALTER TABLE retail_stock_events ADD COLUMN store_id BIGINT UNSIGNED NULL")
         conn.execute(text(_STORE_RETAILERS_SEED))
         conn.execute(text(_STORE_LOCATIONS_SEED))
+
+        # PokéStock FR Phase C — achat assisté (allow-list + audit).
+        conn.execute(text(_BUY_RULES_DDL))
+        conn.execute(text(_BUY_ATTEMPTS_DDL))
+        _add_col(conn, db_name, "retailers", "cart_add_url_template",
+                 "ALTER TABLE retailers ADD COLUMN cart_add_url_template VARCHAR(512) NULL")
+        _add_col(conn, db_name, "retailers", "cart_view_url",
+                 "ALTER TABLE retailers ADD COLUMN cart_view_url VARCHAR(512) NULL")

@@ -27,7 +27,7 @@ from app.services.tracked_sets import ensure_default_tracked_sets
 setup_logging()  # logs JSON + redaction des secrets
 logger = logging.getLogger("backend")
 
-EXPECTED_TABLES = 24  # +2 Phase B (store_locations / offer_store_availability)
+EXPECTED_TABLES = 26  # +2 Phase C (buy_rules / buy_attempts)
 EXPECTED_TIERS = 4
 MIN_SETTINGS = 80
 

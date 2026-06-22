@@ -216,6 +216,7 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
             is_restock = (
                 prev_state in RESTOCK_FROM and offer.current_stock_state in RESTOCK_TO
             )
+            did_alert = False
             if is_restock:
                 stats["transitions"] += 1
                 # Flip value AVANT l'ajout de l'event (aucun flush en attente).
@@ -238,6 +239,7 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
                                         retailer_name=retailer.name, severity=severity, extra=flip)
                     ev.detected_to_alert_ms = int((time.monotonic() - check_start) * 1000)
                     stats["alerts"] += 1
+                    did_alert = True
             elif transitioned:
                 db.add(RetailStockEvent(
                     offer_id=offer.id, from_state=prev_state,
@@ -247,6 +249,16 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
                 offer.last_changed_at = now
 
             db.commit()
+            # Achat assisté APRÈS commit (évite tout effet de bord transaction) :
+            # no-op si kill-switch off / pas de règle ; dry-run géré en interne.
+            if did_alert:
+                try:
+                    from app.services.assisted_buy import attempt_buy
+                    r = attempt_buy(db, offer=offer, retailer=retailer)
+                    if r.get("status") in ("carted", "dry_run", "blocked"):
+                        stats["assisted"] = stats.get("assisted", 0) + 1
+                except Exception:  # noqa: BLE001 - l'achat assisté ne casse jamais le scan
+                    logger.exception("assisted_buy: échec sur offre %s", offer.id)
             delay = politeness.jittered_delay_s(min_delay)
             if delay:
                 time.sleep(delay)

@@ -364,6 +364,8 @@ CREATE TABLE retailers (
     sitemap_url  VARCHAR(512) NULL,
     availability_url_template VARCHAR(512) NULL,
     store_availability_url_template VARCHAR(512) NULL,
+    cart_add_url_template VARCHAR(512) NULL,
+    cart_view_url VARCHAR(512) NULL,
     is_active    TINYINT(1)   NOT NULL DEFAULT 1,
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -441,6 +443,35 @@ CREATE TABLE offer_store_availability (
     UNIQUE KEY uq_offer_store (offer_id, store_id),
     CONSTRAINT fk_osa_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE,
     CONSTRAINT fk_osa_store FOREIGN KEY (store_id) REFERENCES store_locations (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------ PokéStock FR Phase C : buy_rules ----------
+CREATE TABLE buy_rules (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    scope        ENUM('offer','product_type') NOT NULL,
+    scope_value  VARCHAR(64)  NOT NULL,
+    retailer_id  BIGINT UNSIGNED NULL,
+    max_price    DECIMAL(8,2) NOT NULL,
+    max_quantity INT          NOT NULL DEFAULT 1,
+    is_enabled   TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_buy_rule_scope (scope, scope_value),
+    CONSTRAINT fk_buyrule_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------- PokéStock FR Phase C : buy_attempts ---------
+CREATE TABLE buy_attempts (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    offer_id   BIGINT UNSIGNED NOT NULL,
+    channel    ENUM('online','store') NOT NULL DEFAULT 'online',
+    status     ENUM('carted','blocked','skipped','dry_run') NOT NULL,
+    cart_url   VARCHAR(512) NULL,
+    reason     VARCHAR(128) NULL,
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_buy_attempt_offer (offer_id, created_at),
+    CONSTRAINT fk_buyattempt_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------- PokéStock FR : releases ----------------
