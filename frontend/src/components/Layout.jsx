@@ -113,6 +113,7 @@ const NAV_GROUPS = [
       { to: "/restock", key: "nav.restock" },
       { to: "/flip", key: "nav.flip" },
       { to: "/detaillants", key: "nav.detaillants" },
+      { to: "/magasins", key: "nav.magasins" },
       { to: "/calendrier", key: "nav.calendrier" },
     ],
   },

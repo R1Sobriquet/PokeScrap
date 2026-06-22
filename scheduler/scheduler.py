@@ -198,6 +198,16 @@ def flip_radar_scan() -> None:
     logger.info("flip_radar_scan: %s", result.get("summary"))
 
 
+def retail_check_store_stock() -> None:
+    # Phase B — dispo en magasin (zone Agen ; no-op tant que désactivé).
+    from app.services.retail_store_jobs import run_check_store_stock
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_check_store_stock(db)
+    logger.info("retail_check_store_stock: %s", result.get("summary"))
+
+
 def main() -> None:
     scheduler = BlockingScheduler(timezone=TIMEZONE)
     scheduler.add_job(heartbeat, "interval", minutes=1, id="heartbeat")
@@ -235,6 +245,8 @@ def main() -> None:
     # retail_sourcing_enabled=false. Tier hot ~45 s, normal ~5 min, cold ~horaire.
     poll_sec = int(os.getenv("RETAIL_POLL_INTERVAL_SEC", "45"))
     scheduler.add_job(retail_check_restocks, "interval", seconds=poll_sec, id="retail_check_restocks")
+    # Dispo magasin (Phase B) : cadence lente (offres×magasins explose vite).
+    scheduler.add_job(retail_check_store_stock, "interval", minutes=20, id="retail_check_store_stock")
     scheduler.add_job(
         retail_detect_new_skus,
         CronTrigger(hour="7,19", minute=15, timezone=TIMEZONE),

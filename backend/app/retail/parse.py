@@ -238,3 +238,57 @@ def parse_availability_json(data, url: str) -> OfferSnapshot:
                 break
     return OfferSnapshot(url=url, stock_state=state or UNKNOWN, price=price,
                          currency="EUR", source="json")
+
+
+# Phase B — états dispo MAGASIN (distincts des états online).
+IN_STORE, OUT_OF_STORE, LIMITED, STORE_UNKNOWN = "in_store", "out_of_store", "limited", "unknown"
+_STORE_LIMITED = ("limited", "lowstock", "low_stock", "faible", "dernier", "fewleft")
+# OUT testé AVANT IN ('indisponible' contient 'disponible').
+_STORE_OUT_KW = ("outofstore", "out_of_store", "indisponible", "rupture", "epuise",
+                 "unavailable", "outofstock")
+_STORE_IN_KW = ("instore", "in_store", "instock", "disponible", "available", "enstock",
+                "clickandcollect", "retrait")
+
+
+def parse_store_availability_json(data) -> tuple[str, "Decimal | None"]:
+    """Endpoint dispo MAGASIN (formes variées) → (état magasin, prix).
+
+    États : in_store / limited / out_of_store / unknown. ``limited`` = stock faible.
+    """
+    node = data
+    if isinstance(data, dict):
+        for wrap in ("data", "store", "result", "availability", "stock"):
+            if isinstance(data.get(wrap), dict):
+                node = data[wrap]
+                break
+    if not isinstance(node, dict):
+        return STORE_UNKNOWN, None
+
+    raw = None
+    for key in ("availability", "available", "inStore", "in_store", "stock", "status",
+                "storeStatus", "stockLevel", "quantity", "qty"):
+        if key in node:
+            raw = node[key]
+            break
+    price = None
+    for key in ("price", "amount", "salePrice", "value"):
+        if key in node:
+            price = _to_decimal(node[key])
+            if price is not None:
+                break
+
+    if raw is None:
+        return STORE_UNKNOWN, price
+    low = str(raw).strip().lower().replace(" ", "").replace("-", "")
+    if any(k in low for k in _STORE_LIMITED):
+        return LIMITED, price
+    if any(k in low for k in _STORE_OUT_KW):
+        return OUT_OF_STORE, price
+    if any(k in low for k in _STORE_IN_KW):
+        return IN_STORE, price
+    base = _avail_str(raw)  # repli (bool/int → in/out)
+    if base == IN_STOCK:
+        return IN_STORE, price
+    if base == OUT_OF_STOCK:
+        return OUT_OF_STORE, price
+    return STORE_UNKNOWN, price

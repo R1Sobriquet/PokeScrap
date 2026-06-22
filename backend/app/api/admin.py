@@ -15,11 +15,13 @@ from app.auth.security import get_current_user
 from app.config import get_setting, invalidate_setting
 from app.db import get_db
 from app.models import (
+    OfferStoreAvailability,
     Release,
     RetailOffer,
     RetailStockEvent,
     Retailer,
     Setting,
+    StoreLocation,
     TrackedSet,
     Watchlist,
 )
@@ -449,6 +451,55 @@ def recheck_offer_now(offer_id: int, background: BackgroundTasks,
     from app.services.retail_jobs import recheck_offer
 
     return recheck_offer(db, offer_id)
+
+
+# --------------------------------------------------- Phase B : magasins
+@router.get("/retail/stores")
+def list_stores(db: Session = Depends(get_db)) -> list[dict]:
+    names = {r.id: r.name for r in db.scalars(select(Retailer)).all()}
+    rows = db.scalars(select(StoreLocation).order_by(StoreLocation.retailer_id, StoreLocation.name)).all()
+    return [{
+        "id": s.id, "retailer_id": s.retailer_id, "retailer": names.get(s.retailer_id),
+        "store_code": s.store_code, "name": s.name, "city": s.city, "postal": s.postal,
+        "is_watched": bool(s.is_watched),
+    } for s in rows]
+
+
+class StoreUpdate(BaseModel):
+    is_watched: bool
+
+
+@router.put("/retail/stores/{store_id}")
+def update_store(store_id: int, payload: StoreUpdate, db: Session = Depends(get_db)) -> dict:
+    s = db.get(StoreLocation, store_id)
+    if s is None:
+        raise HTTPException(status_code=404, detail="Magasin inconnu")
+    s.is_watched = 1 if payload.is_watched else 0
+    db.commit()
+    return {"id": store_id, "is_watched": bool(s.is_watched), "status": "ok"}
+
+
+@router.get("/retail/store-availability")
+def store_availability(offer_id: int | None = None, db: Session = Depends(get_db)) -> list[dict]:
+    """Dispo par (offre, magasin) — vue de l'écran magasins."""
+    stores = {s.id: s for s in db.scalars(select(StoreLocation)).all()}
+    offers = {o.id: o for o in db.scalars(select(RetailOffer)).all()}
+    stmt = select(OfferStoreAvailability)
+    if offer_id is not None:
+        stmt = stmt.where(OfferStoreAvailability.offer_id == offer_id)
+    out = []
+    for a in db.scalars(stmt.order_by(OfferStoreAvailability.last_changed_at.desc().nullslast())).all():
+        st = stores.get(a.store_id)
+        of = offers.get(a.offer_id)
+        out.append({
+            "offer_id": a.offer_id, "store_id": a.store_id,
+            "title": of.title if of else None,
+            "store": st.name if st else None, "city": st.city if st else None,
+            "availability_state": a.availability_state,
+            "price": float(a.price) if a.price is not None else None,
+            "last_changed_at": a.last_changed_at.isoformat() if a.last_changed_at else None,
+        })
+    return out
 
 
 @router.delete("/retail/offers/{offer_id}")

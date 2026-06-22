@@ -18,6 +18,7 @@ import Jobs from "./pages/Jobs.jsx";
 import Restock from "./pages/Restock.jsx";
 import FlipRadar from "./pages/FlipRadar.jsx";
 import Retailers from "./pages/Retailers.jsx";
+import Stores from "./pages/Stores.jsx";
 import Calendar from "./pages/Calendar.jsx";
 import FutureRadar from "./pages/FutureRadar.jsx";
 import DealAnalyzer from "./pages/DealAnalyzer.jsx";
@@ -54,6 +55,7 @@ export default function App() {
             <Route path="/restock" element={<Restock />} />
             <Route path="/flip" element={<FlipRadar />} />
             <Route path="/detaillants" element={<Retailers />} />
+            <Route path="/magasins" element={<Stores />} />
             <Route path="/calendrier" element={<Calendar />} />
             <Route path="/future" element={<FutureRadar />} />
             <Route path="/analyzer" element={<DealAnalyzer />} />

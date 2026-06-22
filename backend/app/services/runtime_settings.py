@@ -63,6 +63,10 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("retail_poll_interval_sec", "45", "int", "Période (s) du job de poll restock (tier pilote la cadence réelle)"),
     ("retail_bucket_capacity", "12", "int", "Token bucket par enseigne : capacité (burst max de requêtes)"),
     ("retail_bucket_refill_per_sec", "0.25", "decimal", "Token bucket : tokens rechargés/s (débit soutenu max/enseigne)"),
+    # Phase B — dispo en magasin (zone Agen). Plus lent que le hot online.
+    ("retail_store_stock_enabled", "false", "bool", "Active la veille dispo en magasin (sous retail_sourcing_enabled)"),
+    ("retail_store_check_interval_min", "60", "int", "Intervalle min (min) entre deux checks d'un (offre,magasin)"),
+    ("retail_store_request_cap_per_run", "30", "int", "Plafond de requêtes par run du job dispo magasin"),
     ("telegram_enabled", "false", "bool", "Active les notifications Telegram (token/chat_id dans .env)"),
     # Moat de données marché — multi-sources (défauts prudents : tout OFF, watched-only)
     ("marketdata_enabled", "false", "bool", "Master switch du moat de données marché"),

@@ -172,6 +172,32 @@ Agressif sur le **planning**, léger sur les **requêtes** :
 le `hot`, pas en temps réel. Battre des bots à fermes de proxys résidentiels est
 **hors scope** — on vise « plus rapide qu'un humain qui navigue ».
 
+### Phase B — dispo en magasin (zone Agen)
+
+Réassort **physique** via le widget « disponible en magasin / click & collect »
+des enseignes, pour quelques magasins près d'Agen (pas de traçage logistique).
+- Tables `store_locations` (magasins suivis) + `offer_store_availability` (état
+  par `(offre, magasin)`, upsert idempotent) ; `retail_stock_events.store_id`
+  (online = NULL, magasin = id).
+- Adapter `fetch_store_availability(offre, magasin)` →
+  `retailers.store_availability_url_template` (`{sku}`/`{store_code}`), JSON parsé
+  en `in_store`/`limited`/`out_of_store`, requête conditionnelle ETag. Endpoint +
+  `store_code` réels **confirmés à l'inspection** (NULL ⇒ aucun fetch).
+- Job `retail-check-store-stock` : `watched × watched` uniquement, plafond/run +
+  token bucket + circuit breaker, **cadence lente** (offres × magasins explose) ;
+  transition → `retail_stock_events(store_id)` + **alerte nommant le magasin**
+  (Discord 🏬 + Telegram). Sous `retail_sourcing_enabled` + `retail_store_stock_enabled`
+  + dry-run.
+- Seed zone Agen : Micromania (Agen/Boé, Montauban), Cultura (Agen, Montauban),
+  King Jouet (Boé, Villeneuve) en `is_watched=1` ; JouéClub/La Grande Récré en
+  `is_watched=0` (à vérifier). Écran **Magasins** (toggle + vue dispo).
+
+**Hors pipeline (suivi manuel, indés sans stock en ligne)** : Guyajeux Agen &
+Marmande, La Meeple'rie Villeneuve — Facebook/Instagram uniquement.
+
+**Honnêteté** : la dispo magasin est **retardée et approximative** (le site peut
+dire « dispo » alors que le rayon est vide, et l'inverse) — c'est un indice.
+
 ### Flip Radar — où est l'argent maintenant
 
 L'écran **Flip Radar** (`/flip`, `app/services/flip_radar.py`) classe en continu

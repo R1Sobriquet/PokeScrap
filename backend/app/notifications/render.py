@@ -43,6 +43,9 @@ _STOCK_BADGE = {
     "preorder": "🟡 Précommande",
     "out_of_stock": "❌ Rupture",
     "unknown": "❔ Inconnu",
+    "in_store": "🏬 Dispo magasin",
+    "limited": "🟠 Stock faible",
+    "out_of_store": "❌ Indispo magasin",
 }
 
 
@@ -144,8 +147,13 @@ def _retail_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ..
     price = payload.get("price")
     currency = payload.get("currency", "EUR")
     url = payload.get("url")
+    is_store = payload.get("subtype") == "STORE"
     fields = [
         EmbedField("Enseigne", str(payload.get("retailer", "—"))),
+    ]
+    if is_store and payload.get("store"):
+        fields.append(EmbedField("Magasin", str(payload.get("store"))))
+    fields += [
         EmbedField("État", _STOCK_BADGE.get(state, state or "—")),
         EmbedField("Prix (MSRP)", f"{_money(price)} {currency}" if price is not None else "—"),
     ]
@@ -160,8 +168,12 @@ def _retail_embed(alert, payload: dict) -> tuple[EmbedSpec, tuple[ButtonSpec, ..
             "Flip",
             f"{tone_icon} {verdict}" + (f" ({'+' if (upside or 0) >= 0 else ''}{upside}%)" if upside is not None else ""),
         ))
-    icon = "🆕" if is_new else "🔔"
-    label = "Nouveau SKU" if is_new else "Restock"
+    if is_store:
+        icon, label = "🏬", "Dispo magasin"
+    elif is_new:
+        icon, label = "🆕", "Nouveau SKU"
+    else:
+        icon, label = "🔔", "Restock"
     embed = EmbedSpec(
         title=f"{icon} {label} — {alert.title}",
         description=payload.get("message"),

@@ -18,6 +18,10 @@ class RetailStockEvent(Base):
     offer_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("retail_offers.id", ondelete="CASCADE"), nullable=False
     )
+    # Phase B — magasin physique : online = NULL, en magasin = store_id.
+    store_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("store_locations.id", ondelete="SET NULL"), nullable=True
+    )
     from_state: Mapped[str | None] = mapped_column(String(16), nullable=True)
     to_state: Mapped[str] = mapped_column(String(16), nullable=False)
     price: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)

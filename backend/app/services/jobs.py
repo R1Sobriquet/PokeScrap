@@ -105,6 +105,12 @@ def _run_flip_radar(db: Session) -> dict:
     return run_flip_radar(db)
 
 
+def _run_check_store_stock(db: Session) -> dict:
+    from app.services.retail_store_jobs import run_check_store_stock
+
+    return run_check_store_stock(db)
+
+
 JOBS = {
     "sync-tracked-sets": _run_sync_tracked_sets,
     "refresh-prices": _run_refresh_prices,
@@ -124,6 +130,7 @@ JOBS = {
     "match-products": _run_match_products,
     "source-health-check": _run_source_health_check,
     "flip-radar-scan": _run_flip_radar,
+    "retail-check-store-stock": _run_check_store_stock,
 }
 
 

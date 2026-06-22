@@ -218,6 +218,63 @@ def _add_index(conn, db_name: str, table: str, index: str, ddl: str) -> None:
         logger.info("Migration : index %s.%s ajouté.", table, index)
 
 
+_STORE_LOCATIONS_DDL = """
+CREATE TABLE IF NOT EXISTS store_locations (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    retailer_id BIGINT UNSIGNED NOT NULL,
+    store_code  VARCHAR(64)  NOT NULL,
+    name        VARCHAR(128) NOT NULL,
+    city        VARCHAR(96)  NULL,
+    postal      VARCHAR(16)  NULL,
+    is_watched  TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_store_retailer_code (retailer_id, store_code),
+    CONSTRAINT fk_store_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_OFFER_STORE_DDL = """
+CREATE TABLE IF NOT EXISTS offer_store_availability (
+    id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    offer_id           BIGINT UNSIGNED NOT NULL,
+    store_id           BIGINT UNSIGNED NOT NULL,
+    availability_state ENUM('in_store','out_of_store','limited','unknown') NOT NULL DEFAULT 'unknown',
+    price              DECIMAL(8,2) NULL,
+    last_checked_at    DATETIME NULL,
+    last_changed_at    DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_offer_store (offer_id, store_id),
+    CONSTRAINT fk_osa_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE,
+    CONSTRAINT fk_osa_store FOREIGN KEY (store_id) REFERENCES store_locations (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+# Seed enseignes (additif, INSERT IGNORE) — nouvelles enseignes magasin.
+_STORE_RETAILERS_SEED = """
+INSERT IGNORE INTO retailers (code, name, base_url, is_active) VALUES
+    ('king-jouet',   'King Jouet',      'https://www.king-jouet.com', 1),
+    ('joueclub',     'JouéClub',        'https://www.joueclub.fr',    1),
+    ('lagranderecre','La Grande Récré', 'https://www.lagranderecre.fr', 1)
+"""
+
+# Seed magasins zone Agen. store_code = placeholder éditable (confirmé à l'inspection).
+# Confirmés scrapables → is_watched=1 ; probables → is_watched=0.
+_STORE_LOCATIONS_SEED = """
+INSERT IGNORE INTO store_locations (retailer_id, store_code, name, city, postal, is_watched)
+SELECT r.id, s.store_code, s.name, s.city, s.postal, s.is_watched FROM (
+    SELECT 'micromania' rc, 'agen-boe'    store_code, 'Micromania Agen/Boé'  name, 'Boé'                 city, '47550' postal, 1 is_watched UNION ALL
+    SELECT 'micromania', 'montauban',     'Micromania Montauban',            'Montauban',            '82000', 1 UNION ALL
+    SELECT 'cultura',    'agen',          'Cultura Agen',                    'Agen',                 '47000', 1 UNION ALL
+    SELECT 'cultura',    'montauban',     'Cultura Montauban',               'Montauban',            '82000', 1 UNION ALL
+    SELECT 'king-jouet', 'boe-1111',      'King Jouet Boé',                  'Boé',                  '47550', 1 UNION ALL
+    SELECT 'king-jouet', 'villeneuve-0330','King Jouet Villeneuve-sur-Lot',  'Villeneuve-sur-Lot',   '47300', 1 UNION ALL
+    SELECT 'joueclub',   'boe',           'JouéClub Boé',                    'Boé',                  '47550', 0 UNION ALL
+    SELECT 'lagranderecre','agen',        'La Grande Récré Agen',            'Agen',                 '47000', 0
+) s JOIN retailers r ON r.code = s.rc
+"""
+
+
 def ensure_schema_upgrades(engine: Engine) -> None:
     """Applique les upgrades manquants (MySQL uniquement)."""
     if engine.dialect.name != "mysql":
@@ -308,3 +365,13 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                  "ALTER TABLE retail_stock_events ADD COLUMN detected_to_alert_ms INT NULL")
         _add_col(conn, db_name, "retailers", "availability_url_template",
                  "ALTER TABLE retailers ADD COLUMN availability_url_template VARCHAR(512) NULL AFTER sitemap_url")
+
+        # PokéStock FR Phase B — dispo en magasin (zone Agen).
+        conn.execute(text(_STORE_LOCATIONS_DDL))
+        conn.execute(text(_OFFER_STORE_DDL))
+        _add_col(conn, db_name, "retailers", "store_availability_url_template",
+                 "ALTER TABLE retailers ADD COLUMN store_availability_url_template VARCHAR(512) NULL")
+        _add_col(conn, db_name, "retail_stock_events", "store_id",
+                 "ALTER TABLE retail_stock_events ADD COLUMN store_id BIGINT UNSIGNED NULL")
+        conn.execute(text(_STORE_RETAILERS_SEED))
+        conn.execute(text(_STORE_LOCATIONS_SEED))

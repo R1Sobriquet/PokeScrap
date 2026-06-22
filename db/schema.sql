@@ -363,6 +363,7 @@ CREATE TABLE retailers (
     base_url     VARCHAR(255) NULL,
     sitemap_url  VARCHAR(512) NULL,
     availability_url_template VARCHAR(512) NULL,
+    store_availability_url_template VARCHAR(512) NULL,
     is_active    TINYINT(1)   NOT NULL DEFAULT 1,
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -404,11 +405,42 @@ CREATE TABLE retail_stock_events (
     from_state  VARCHAR(16)  NULL,
     to_state    VARCHAR(16)  NOT NULL,
     price       DECIMAL(8,2) NULL,
+    store_id    BIGINT UNSIGNED NULL,
     detected_to_alert_ms INT    NULL,
     detected_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_offer_detected (offer_id, detected_at),
     CONSTRAINT fk_event_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------- PokéStock FR Phase B : store_locations ---------
+CREATE TABLE store_locations (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    retailer_id BIGINT UNSIGNED NOT NULL,
+    store_code  VARCHAR(64)  NOT NULL,
+    name        VARCHAR(128) NOT NULL,
+    city        VARCHAR(96)  NULL,
+    postal      VARCHAR(16)  NULL,
+    is_watched  TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_store_retailer_code (retailer_id, store_code),
+    CONSTRAINT fk_store_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------- PokéStock FR Phase B : offer_store_availability ------
+CREATE TABLE offer_store_availability (
+    id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    offer_id           BIGINT UNSIGNED NOT NULL,
+    store_id           BIGINT UNSIGNED NOT NULL,
+    availability_state ENUM('in_store','out_of_store','limited','unknown') NOT NULL DEFAULT 'unknown',
+    price              DECIMAL(8,2) NULL,
+    last_checked_at    DATETIME NULL,
+    last_changed_at    DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_offer_store (offer_id, store_id),
+    CONSTRAINT fk_osa_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE,
+    CONSTRAINT fk_osa_store FOREIGN KEY (store_id) REFERENCES store_locations (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------- PokéStock FR : releases ----------------
