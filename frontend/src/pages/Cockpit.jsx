@@ -4,6 +4,7 @@ import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { eur, pct } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
+import HoloCard from "../components/HoloCard.jsx";
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
@@ -38,6 +39,15 @@ function GaugeCard({ label, value, pill, pillColor, pillBg, barPct, barGrad, cap
   );
 }
 
+function Stat({ label, value, color }) {
+  return (
+    <div>
+      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-0.5 font-mono text-[18px] font-bold" style={color ? { color } : undefined}>{value}</div>
+    </div>
+  );
+}
+
 function MonoRow({ label, value, muted }) {
   return (
     <div className="flex items-center justify-between py-1">
@@ -60,6 +70,7 @@ export default function Cockpit() {
   const { data, loading } = usePolling("/cockpit");
   const { data: movers } = usePolling("/movers");
   const { data: sets } = usePolling("/tracked-sets", { intervalSec: 120 });
+  const { data: opps } = usePolling("/retail/opportunities", { intervalSec: 90 });
   const { t } = useI18n();
   const navigate = useNavigate();
   if (loading || !data) return <p className="text-slate-400">{t("common.loading")}</p>;
@@ -68,6 +79,10 @@ export default function Cockpit() {
   const a = data.allocation;
   const profitUp = (k.realized_profit_net ?? 0) >= 0;
   const investedPct = k.total_portfolio_value ? (k.capital_invested / k.total_portfolio_value) * 100 : 0;
+  const deal = (opps || [])[0];
+  const dealAccent = deal
+    ? (deal.verdict_tone === "buy" ? "#1E7A4D" : deal.verdict_tone === "pass" ? "#7A1220" : "#5B3FA8")
+    : "#5B3FA8";
 
   return (
     <div className="space-y-8">
@@ -80,6 +95,54 @@ export default function Cockpit() {
         <div className="flex items-center gap-2 font-mono text-[11px] tracking-[0.1em] text-slate-500">
           <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--green)", animation: "pa-pulse 1.6s infinite" }} />
           {t("cockpit.live")}
+        </div>
+      </div>
+
+      {/* Deal of the Day — carte holo 3D interactive */}
+      <div className="overflow-hidden rounded-2xl" style={{ ...panel, background: "var(--ai-bg)", border: "1px solid var(--ai-border)" }}>
+        <div className="grid items-center gap-2 md:grid-cols-[360px_1fr]">
+          <div className="cursor-grab active:cursor-grabbing">
+            <HoloCard
+              accent={dealAccent}
+              height={340}
+              title={deal ? (deal.title || deal.product_name || "Deal") : "Aucun deal"}
+              sub={deal ? (deal.retailer || "—") : "active la veille restock"}
+              price={deal ? eur(deal.retail_price) : "—"}
+              verdict={deal ? deal.verdict : null}
+            />
+          </div>
+          <div className="p-5 pr-7">
+            <div className="font-mono text-[11px] uppercase tracking-[0.16em]" style={{ color: "var(--violet-text)" }}>
+              {t("cockpit.dealOfDay")}
+            </div>
+            {deal ? (
+              <>
+                <div className="mt-2 text-2xl font-extrabold tracking-tight">{deal.title || deal.product_name}</div>
+                <div className="mt-1 font-mono text-[11px] tracking-[0.12em] text-slate-500">{deal.retailer}</div>
+                <div className="mt-4 flex flex-wrap items-center gap-5">
+                  <Stat label="MSRP" value={eur(deal.retail_price)} />
+                  <Stat label={t("cockpit.deal.market")} value={eur(deal.market_value)} />
+                  <Stat label={t("flip.col.upside")} value={`${(deal.net_upside_pct ?? 0) >= 0 ? "+" : ""}${deal.net_upside_pct}%`} color="var(--green-text)" />
+                  <Stat label={t("flip.col.profit")} value={eur(deal.est_profit)} color="var(--gold)" />
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2.5">
+                  <a href={deal.url} target="_blank" rel="noreferrer" className="rounded-xl px-4 py-2.5 text-sm font-bold text-ink"
+                     style={{ background: "linear-gradient(180deg, #FFD75A, #FFC91F)" }}>
+                    {t("cockpit.deal.grab")}
+                  </a>
+                  <button onClick={() => navigate("/flip")} className="rounded-xl px-4 py-2.5 text-sm font-semibold"
+                          style={{ border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text2)" }}>
+                    {t("cockpit.deal.all")}
+                  </button>
+                </div>
+                <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-slate-600">
+                  ✨ {t("cockpit.deal.drag")}
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 max-w-md text-sm text-slate-500">{t("cockpit.deal.empty")}</p>
+            )}
+          </div>
         </div>
       </div>
 
