@@ -5,12 +5,15 @@ import { useI18n } from "../i18n.jsx";
 import { eur, pct } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 import HoloCard from "../components/HoloCard.jsx";
+import { CountUp, Confetti } from "../components/motion.jsx";
+
+const money = (v) => `${(Number(v) || 0).toFixed(2)} €`;
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
 // Carte « jauge » du design : label mono, pastille d'état, grande valeur mono,
 // barre de progression animée, légende.
-function GaugeCard({ label, value, pill, pillColor, pillBg, barPct, barGrad, caption }) {
+function GaugeCard({ label, value, count, fmt, pill, pillColor, pillBg, barPct, barGrad, caption }) {
   return (
     <div className="rounded-2xl p-5 transition-colors" style={panel}>
       <div className="flex items-center justify-between">
@@ -21,7 +24,9 @@ function GaugeCard({ label, value, pill, pillColor, pillBg, barPct, barGrad, cap
           </div>
         )}
       </div>
-      <div className="mt-3 font-mono text-[28px] font-bold leading-none">{value}</div>
+      <div className="mt-3 font-mono text-[28px] font-bold leading-none">
+        {count != null ? <CountUp value={count} format={fmt} /> : value}
+      </div>
       <div className="mt-3 h-1 overflow-hidden rounded" style={{ background: "var(--bar)" }}>
         <div
           style={{
@@ -101,7 +106,8 @@ export default function Cockpit() {
       {/* Deal of the Day — carte holo 3D interactive */}
       <div className="overflow-hidden rounded-2xl" style={{ ...panel, background: "var(--ai-bg)", border: "1px solid var(--ai-border)" }}>
         <div className="grid items-center gap-2 md:grid-cols-[360px_1fr]">
-          <div className="cursor-grab active:cursor-grabbing">
+          <div className="relative cursor-grab active:cursor-grabbing">
+            <Confetti fire={deal?.verdict === "STRONG BUY"} />
             <HoloCard
               accent={dealAccent}
               height={340}
@@ -154,6 +160,7 @@ export default function Cockpit() {
         <div className="mt-3 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <GaugeCard
             label={t("cockpit.kpi.portfolio")}
+            count={k.total_portfolio_value} fmt={money}
             value={eur(k.total_portfolio_value)}
             pill={a ? `${pct(a.stock_pct)} ${t("cockpit.pill.stock")}` : null}
             pillColor="var(--blue-soft)"
@@ -164,6 +171,7 @@ export default function Cockpit() {
           />
           <GaugeCard
             label={t("cockpit.kpi.invested")}
+            count={k.capital_invested} fmt={money}
             value={eur(k.capital_invested)}
             pill={`×${k.capital_rotation_rate ?? "—"}`}
             pillColor="var(--yellow-text)"
@@ -174,6 +182,7 @@ export default function Cockpit() {
           />
           <GaugeCard
             label={t("cockpit.kpi.cash")}
+            count={k.cash_total} fmt={money}
             value={eur(k.cash_total)}
             pill={t("cockpit.pill.active")}
             pillColor="var(--green-text)"
@@ -184,6 +193,7 @@ export default function Cockpit() {
           />
           <GaugeCard
             label={t("cockpit.kpi.profit")}
+            count={k.realized_profit_net} fmt={money}
             value={eur(k.realized_profit_net)}
             pill={profitUp ? "▲" : "▼"}
             pillColor={profitUp ? "var(--green-text)" : "var(--red-text)"}

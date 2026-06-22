@@ -5,6 +5,7 @@ import { useTheme, THEMES } from "../ThemeContext.jsx";
 import { useI18n, LANGS } from "../i18n.jsx";
 import { usePolling } from "../hooks/usePolling.js";
 import PackModal from "./PackModal.jsx";
+import Ticker from "./Ticker.jsx";
 
 const SEV_DOT = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--green)" };
 
@@ -289,8 +290,11 @@ export default function Layout() {
           </nav>
         </aside>
 
-        <main className="flex-1 overflow-x-hidden p-5 pa-pagein">
-          <Outlet />
+        <main className="flex-1 overflow-x-hidden">
+          <Ticker />
+          <div className="p-5 pa-pagein">
+            <Outlet />
+          </div>
         </main>
       </div>
     </div>
