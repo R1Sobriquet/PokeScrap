@@ -112,11 +112,21 @@ def _is_flapping(db: Session, offer_id: int, debounce_min: int, now: dt.datetime
     return int(n) >= 2
 
 
-def _due_for_check(offer: RetailOffer, interval_min: int, now: dt.datetime) -> bool:
-    """Respecte l'intervalle min entre deux checks d'une même offre (économie requêtes)."""
+def _tier_interval_sec(offer: RetailOffer, *, hot_sec: int, normal_min: int, cold_min: int) -> int:
+    """Intervalle de check selon le tier (hot agressif, cold horaire)."""
+    tier = (offer.watch_tier or "normal").lower()
+    if tier == "hot":
+        return max(5, hot_sec)
+    if tier == "cold":
+        return cold_min * 60
+    return normal_min * 60
+
+
+def _due_for_check(offer: RetailOffer, interval_sec: int, now: dt.datetime) -> bool:
+    """Respecte l'intervalle (s) entre deux checks d'une même offre (selon tier)."""
     if offer.last_checked_at is None:
         return True
-    return offer.last_checked_at <= now - dt.timedelta(minutes=interval_min)
+    return offer.last_checked_at <= now - dt.timedelta(seconds=interval_sec)
 
 
 def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) -> dict:
@@ -127,7 +137,12 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
     dry = bool(get_setting("retail_dry_run", default=True))
     cap = int(get_setting("retail_request_cap_per_run", default=40))
     min_delay = int(get_setting("retail_min_delay_ms", default=3000))
-    interval = int(get_setting("retail_check_interval_min", default=60))
+    # Phase A — intervalles par tier + token bucket par enseigne.
+    hot_sec = int(get_setting("retail_tier_hot_sec", default=45))
+    normal_min = int(get_setting("retail_tier_normal_min", default=5))
+    cold_min = int(get_setting("retail_tier_cold_min", default=60))
+    bucket_cap = int(get_setting("retail_bucket_capacity", default=12))
+    bucket_refill = float(get_setting("retail_bucket_refill_per_sec", default=0.25))
     cooldown = int(get_setting("retail_restock_cooldown_min", default=360))
     debounce = int(get_setting("restock_debounce_min", default=30))
     max_err = int(get_setting("retail_circuit_max_errors", default=5))
@@ -148,19 +163,30 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
             stats["blocked"] += 1
             continue
         source = HttpRetailSource(_to_dc(retailer), http_get=http_get or httpx_get)
+        # Tier d'abord (hot prioritaire) → le budget part sur les offres chaudes.
         offers = db.scalars(
             select(RetailOffer).where(
                 RetailOffer.retailer_id == retailer.id, RetailOffer.is_watched == 1
-            )
+            ).order_by(RetailOffer.watch_tier.asc(), RetailOffer.last_checked_at.asc().nullsfirst())
         ).all()
         for offer in offers:
-            if not _due_for_check(offer, interval, now):
+            interval_sec = _tier_interval_sec(offer, hot_sec=hot_sec, normal_min=normal_min,
+                                              cold_min=cold_min)
+            if not _due_for_check(offer, interval_sec, now):
                 continue
             if not budget.allow():
                 logger.info("retail: plafond de requêtes atteint (%s).", cap)
                 break
+            # Token bucket par enseigne : borne le débit soutenu (anti-ban).
+            if not politeness.take_token(db, retailer.code, now,
+                                         capacity=bucket_cap, refill_per_sec=bucket_refill):
+                logger.info("retail: token bucket vide pour %s — requête différée.", retailer.code)
+                break
+            check_start = time.monotonic()
             try:
-                snap = source.fetch_offer(offer.url)
+                snap, new_etag = source.fetch_availability(
+                    offer.url, template=retailer.availability_url_template,
+                    sku=offer.retailer_sku, etag=offer.availability_etag)
             except RetailBlocked as exc:
                 mins = politeness.record_retailer_error(
                     db, retailer.code, now, cooldown_cap_min=cooldown_cap
@@ -177,6 +203,12 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
                 continue
 
             politeness.clear_retailer_errors(db, retailer.code)
+            if new_etag:
+                offer.availability_etag = new_etag[:255]
+            if snap is None:  # 304 inchangé : on note juste le check, pas de transition
+                offer.last_checked_at = now
+                db.commit()
+                continue
             stats["checked"] += 1
             prev_state = offer.current_stock_state
             transitioned = _apply_snapshot(offer, snap, now)
@@ -188,11 +220,12 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
                 stats["transitions"] += 1
                 # Flip value AVANT l'ajout de l'event (aucun flush en attente).
                 flip = flip_for_offer(db, offer, fx=fx, market=market, fee_pct=fee_pct)
-                db.add(RetailStockEvent(
+                ev = RetailStockEvent(
                     offer_id=offer.id, from_state=prev_state,
                     to_state=offer.current_stock_state, price=offer.current_price,
                     detected_at=now,
-                ))
+                )
+                db.add(ev)
                 offer.last_changed_at = now
                 # Ping instantané seulement si flip ≥ seuil (sinon digest) ;
                 # non matché / sans valeur marché → instantané (décision humaine).
@@ -203,6 +236,7 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
                     db.flush()  # garantit offer.id pour le payload
                     create_retail_alert(db, kind="RESTOCK", offer=offer,
                                         retailer_name=retailer.name, severity=severity, extra=flip)
+                    ev.detected_to_alert_ms = int((time.monotonic() - check_start) * 1000)
                     stats["alerts"] += 1
             elif transitioned:
                 db.add(RetailStockEvent(
@@ -223,6 +257,81 @@ def _scan_watched(db: Session, *, alert: bool, http_get: HttpGet | None = None) 
         f"{stats['alerts']} alertes / {stats['blocked']} bloqués{mode}"
     )
     return stats
+
+
+def recheck_offer(db: Session, offer_id: int, *, http_get: HttpGet | None = None) -> dict:
+    """Re-check IMMÉDIAT d'une offre (déclencheur manuel/communautaire), hors
+    cadence tier. Même politesse (circuit breaker) ; même pipeline d'alerte."""
+    if _sourcing_off():
+        return {"status": "sourcing_off"}
+    offer = db.get(RetailOffer, offer_id)
+    if offer is None:
+        return {"status": "unknown_offer"}
+    retailer = db.get(Retailer, offer.retailer_id)
+    if retailer is None:
+        return {"status": "unknown_retailer"}
+    now = _utcnow()
+    max_err = int(get_setting("retail_circuit_max_errors", default=5))
+    if politeness.circuit_open(db, retailer.code, now, max_err):
+        return {"status": "circuit_open"}
+
+    source = HttpRetailSource(_to_dc(retailer), http_get=http_get or httpx_get)
+    cooldown_cap = int(get_setting("scrape_blocked_cooldown_min", default=120))
+    check_start = time.monotonic()
+    try:
+        snap, new_etag = source.fetch_availability(
+            offer.url, template=retailer.availability_url_template,
+            sku=offer.retailer_sku, etag=offer.availability_etag)
+    except RetailBlocked as exc:
+        politeness.record_retailer_error(db, retailer.code, now, cooldown_cap_min=cooldown_cap)
+        return {"status": "blocked", "reason": exc.reason}
+    except Exception:  # noqa: BLE001
+        logger.exception("recheck: échec fetch %s", offer.url)
+        return {"status": "fetch_failed"}
+
+    politeness.clear_retailer_errors(db, retailer.code)
+    if new_etag:
+        offer.availability_etag = new_etag[:255]
+    if snap is None:
+        offer.last_checked_at = now
+        db.commit()
+        return {"status": "unchanged", "stock_state": offer.current_stock_state}
+
+    dry = bool(get_setting("retail_dry_run", default=True))
+    cooldown = int(get_setting("retail_restock_cooldown_min", default=360))
+    debounce = int(get_setting("restock_debounce_min", default=30))
+    min_flip = float(get_setting("restock_min_flip_pct", default=0))
+    fee_pct = float(get_setting("resale_fee_pct", default=12))
+    fx = float(get_setting("fx_usd_eur", default=0.92))
+    market = str(get_setting("valuation_market", default="US"))
+
+    prev = offer.current_stock_state
+    transitioned = _apply_snapshot(offer, snap, now)
+    is_restock = prev in RESTOCK_FROM and offer.current_stock_state in RESTOCK_TO
+    alerted = False
+    if is_restock:
+        flip = flip_for_offer(db, offer, fx=fx, market=market, fee_pct=fee_pct)
+        ev = RetailStockEvent(offer_id=offer.id, from_state=prev,
+                              to_state=offer.current_stock_state, price=offer.current_price,
+                              detected_at=now)
+        db.add(ev)
+        offer.last_changed_at = now
+        low = flip["net_upside_pct"] is not None and flip["net_upside_pct"] < min_flip
+        if not dry and not _recent_restock(db, offer.id, cooldown, now) \
+                and not _is_flapping(db, offer.id, debounce, now):
+            db.flush()
+            create_retail_alert(db, kind="RESTOCK", offer=offer, retailer_name=retailer.name,
+                                severity=("info" if low else "warning"), extra=flip)
+            ev.detected_to_alert_ms = int((time.monotonic() - check_start) * 1000)
+            alerted = True
+    elif transitioned:
+        db.add(RetailStockEvent(offer_id=offer.id, from_state=prev,
+                                to_state=offer.current_stock_state, price=offer.current_price,
+                                detected_at=now))
+        offer.last_changed_at = now
+    db.commit()
+    return {"status": "ok", "stock_state": offer.current_stock_state,
+            "transition": is_restock, "alert": alerted}
 
 
 def _apply_snapshot(offer: RetailOffer, snap, now: dt.datetime) -> bool:

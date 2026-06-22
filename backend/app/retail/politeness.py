@@ -10,13 +10,19 @@ mécanisme parallèle) avec une clé ``retail:<code>``.
 from __future__ import annotations
 
 import datetime as dt
+import json
 import random
 import urllib.robotparser
 
+from sqlalchemy import select
 from sqlalchemy.orm import Session
 
+from app.config import invalidate_setting
+from app.models import Setting
 from app.scraping.antibot import REALISTIC_UA
 from app.services import scrape_state
+
+_BUCKET_KEY = "retail_token_bucket"
 
 
 def default_headers() -> dict[str, str]:
@@ -102,3 +108,49 @@ def circuit_open(db: Session, code: str, now: dt.datetime, max_errors: int) -> b
     if is_retailer_blocked(db, code, now):
         return True
     return retailer_error_count(db, code) >= max(1, int(max_errors))
+
+
+# ----------------------------------------------- token bucket par enseigne
+def _bucket_load(db: Session) -> dict:
+    row = db.scalar(select(Setting).where(Setting.setting_key == _BUCKET_KEY))
+    if row is None or not row.setting_value:
+        return {}
+    try:
+        return json.loads(row.setting_value)
+    except json.JSONDecodeError:
+        return {}
+
+
+def _bucket_save(db: Session, state: dict) -> None:
+    row = db.scalar(select(Setting).where(Setting.setting_key == _BUCKET_KEY))
+    value = json.dumps(state)
+    if row is None:
+        db.add(Setting(setting_key=_BUCKET_KEY, setting_value=value, value_type="json",
+                       description="Token bucket de débit par enseigne (auto)"))
+    else:
+        row.setting_value = value
+    db.commit()
+    invalidate_setting(_BUCKET_KEY)
+
+
+def take_token(db: Session, code: str, now: dt.datetime, *,
+               capacity: int, refill_per_sec: float) -> bool:
+    """Consomme un jeton (débit soutenu borné par enseigne, entre runs). Recharge
+    proportionnelle au temps écoulé. ``False`` si vide → on saute la requête."""
+    capacity = max(1, int(capacity))
+    state = _bucket_load(db)
+    entry = state.get(code) or {}
+    tokens = float(entry.get("tokens", capacity))
+    last = entry.get("at")
+    if last:
+        try:
+            elapsed = max(0.0, (now - dt.datetime.fromisoformat(last)).total_seconds())
+            tokens = min(capacity, tokens + elapsed * max(0.0, float(refill_per_sec)))
+        except ValueError:
+            tokens = capacity
+    allowed = tokens >= 1.0
+    if allowed:
+        tokens -= 1.0
+    state[code] = {"tokens": round(tokens, 3), "at": now.isoformat()}
+    _bucket_save(db, state)
+    return allowed

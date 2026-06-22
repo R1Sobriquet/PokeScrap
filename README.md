@@ -147,6 +147,31 @@ Discord/Telegram porte le verdict. Réglage `restock_min_flip_pct` : seul un fli
 digest) → on n'est pingé que sur les vrais coups. Verdict **net de frais**
 (`resale_fee_pct`) — un +12% brut peut être nul après frais.
 
+### Phase A — latence de détection online
+
+Agressif sur le **planning**, léger sur les **requêtes** :
+- **Hot-list à 3 niveaux** (`retail_offers.watch_tier` : `hot`/`normal`/`cold`) :
+  le job de poll tourne court (`RETAIL_POLL_INTERVAL_SEC`, ~45 s) mais chaque
+  offre n'est checkée qu'à l'intervalle de son tier (`retail_tier_hot_sec`,
+  `retail_tier_normal_min`, `retail_tier_cold_min`). Le budget part sur le `hot`.
+- **Endpoint XHR de dispo > page** : `retailers.availability_url_template`
+  (`{sku}`/`{url}`) → JSON léger parsé en priorité, fallback page si absent. À
+  **confirmer par enseigne au go-live** (comme `sitemap_url`) ; vide par défaut.
+- **Requête conditionnelle ETag** : `If-None-Match` → `304` = inchangé, on saute
+  le parsing (économie d'octets).
+- **Anti-ban** : **token bucket par enseigne** (capacité/recharge en `settings`)
+  + jitter + circuit breaker/backoff exponentiel sur 403/429 (réutilise
+  `scrape_state`). Fnac : `hot` sur un set minuscule.
+- **Latence instrumentée** : `retail_stock_events.detected_to_alert_ms`, moyenne
+  par enseigne affichée sur l'écran **Détaillants**.
+- **Déclencheur de re-check immédiat** : `POST /retail/offers/{id}/recheck`
+  (bouton ↻) hors cadence tier ; un consommateur RSS/webhook reste un point
+  d'extension off-by-default.
+
+**Honnêteté** : depuis une IP maison, détection en **dizaines de secondes** sur
+le `hot`, pas en temps réel. Battre des bots à fermes de proxys résidentiels est
+**hors scope** — on vise « plus rapide qu'un humain qui navigue ».
+
 ### Flip Radar — où est l'argent maintenant
 
 L'écran **Flip Radar** (`/flip`, `app/services/flip_radar.py`) classe en continu

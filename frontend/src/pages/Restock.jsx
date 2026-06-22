@@ -79,6 +79,29 @@ export default function Restock() {
     reload();
   }
 
+  const TIERS = ["hot", "normal", "cold"];
+  async function cycleTier(o) {
+    const next = TIERS[(TIERS.indexOf(o.watch_tier || "normal") + 1) % 3];
+    await api.put(token, `/retail/offers/${o.id}`, { watch_tier: next });
+    reload();
+  }
+  async function recheck(o) {
+    setMsg(null);
+    try {
+      const r = await api.post(token, `/retail/offers/${o.id}/recheck`);
+      setMsg(`Re-check ${o.title || o.id} : ${r.status}${r.transition ? " · restock !" : ""}`);
+      reload();
+    } catch (e2) {
+      setMsg(`Erreur : ${e2.message}`);
+    }
+  }
+
+  const TIER_TONE = {
+    hot: { color: "var(--red-text)", bg: "rgba(244,88,95,.14)" },
+    normal: { color: "var(--blue-soft)", bg: "rgba(61,123,255,.1)" },
+    cold: { color: "var(--muted2)", bg: "var(--panel2)" },
+  };
+
   return (
     <div className="space-y-7">
       {/* Header */}
@@ -163,6 +186,11 @@ export default function Restock() {
                       <a href={o.url} target="_blank" rel="noreferrer" className="font-mono text-[10px]" style={{ color: "var(--blue-soft)" }}>
                         {host(o.url)}
                       </a>
+                      <button onClick={() => cycleTier(o)} title="Cliquer pour changer le tier de surveillance"
+                              className="rounded font-mono text-[9px] font-bold uppercase" style={{ padding: "1px 5px", ...(TIER_TONE[o.watch_tier || "normal"]) }}>
+                        {o.watch_tier || "normal"}
+                      </button>
+                      <button onClick={() => recheck(o)} title="Re-check immédiat" className="border-none bg-transparent p-0 font-mono text-[11px] text-slate-500 hover:text-info">↻</button>
                       <button onClick={() => unwatch(o)} className="border-none bg-transparent p-0 font-mono text-[10px] text-slate-600 hover:text-critical">
                         {t("restock.remove")}
                       </button>

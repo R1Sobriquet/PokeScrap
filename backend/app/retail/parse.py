@@ -185,3 +185,56 @@ def parse_dom_offer(html: str, url: str) -> OfferSnapshot:
 def parse_offer(html: str, url: str) -> OfferSnapshot:
     """JSON-LD prioritaire, fallback DOM si aucun ``Product`` JSON-LD."""
     return parse_jsonld_offer(html, url) or parse_dom_offer(html, url)
+
+
+_AVAIL_IN = ("instock", "in_stock", "available", "disponible", "en_stock", "in stock")
+_AVAIL_OUT = ("outofstock", "out_of_stock", "unavailable", "indisponible", "rupture", "epuise")
+_AVAIL_PRE = ("preorder", "pre_order", "precommande", "preorder")
+
+
+def _avail_str(value) -> str | None:
+    """Mappe une valeur d'availability hétérogène (str/bool/int) → état stock."""
+    if isinstance(value, bool):
+        return IN_STOCK if value else OUT_OF_STOCK
+    if isinstance(value, (int, float)):
+        return IN_STOCK if value > 0 else OUT_OF_STOCK
+    if isinstance(value, str):
+        low = value.strip().lower().replace(" ", "")
+        if any(k.replace(" ", "") in low for k in _AVAIL_PRE):
+            return PREORDER
+        if any(k.replace(" ", "") in low for k in _AVAIL_IN):
+            return IN_STOCK
+        if any(k.replace(" ", "") in low for k in _AVAIL_OUT):
+            return OUT_OF_STOCK
+    return None
+
+
+def parse_availability_json(data, url: str) -> OfferSnapshot:
+    """Parse la réponse de l'endpoint XHR de dispo (formes variées, défensif).
+
+    Cherche un champ de dispo (availability/available/inStock/stock/status) et un
+    prix (price/amount). État inconnu → ``UNKNOWN`` (jamais d'invention)."""
+    node = data
+    if isinstance(data, dict):
+        for wrap in ("data", "product", "result", "offer", "stock"):
+            if isinstance(data.get(wrap), dict):
+                node = data[wrap]
+                break
+    if not isinstance(node, dict):
+        return OfferSnapshot(url=url, stock_state=UNKNOWN, source="json")
+
+    state = None
+    for key in ("availability", "available", "inStock", "in_stock", "stock", "status",
+                "stockStatus", "isAvailable", "quantity", "qty"):
+        if key in node:
+            state = _avail_str(node[key])
+            if state:
+                break
+    price = None
+    for key in ("price", "amount", "salePrice", "currentPrice", "value"):
+        if key in node:
+            price = _to_decimal(node[key])
+            if price is not None:
+                break
+    return OfferSnapshot(url=url, stock_state=state or UNKNOWN, price=price,
+                         currency="EUR", source="json")

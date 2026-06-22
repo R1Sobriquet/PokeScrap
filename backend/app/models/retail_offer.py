@@ -33,6 +33,10 @@ class RetailOffer(Base):
     current_price: Mapped[Decimal | None] = mapped_column(Numeric(8, 2), nullable=True)
     currency: Mapped[str] = mapped_column(String(3), nullable=False, default="EUR")
     is_watched: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)
+    # Phase A — hot-list à plusieurs niveaux : 'hot' | 'normal' | 'cold'.
+    watch_tier: Mapped[str] = mapped_column(String(8), nullable=False, default="normal")
+    # Requête conditionnelle (ETag) sur l'endpoint de dispo (économie d'octets).
+    availability_etag: Mapped[str | None] = mapped_column(String(255), nullable=True)
     product_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("products.id", ondelete="SET NULL"), nullable=True
     )

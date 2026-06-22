@@ -331,13 +331,21 @@ def _utcnow():
 
 def _retailer_dict(r: Retailer, db: Session) -> dict:
     now = _utcnow()
+    # Latence in-pipeline moyenne (détection→alerte) sur les events récents.
+    avg_latency = db.scalar(
+        select(func.avg(RetailStockEvent.detected_to_alert_ms))
+        .select_from(RetailStockEvent).join(RetailOffer, RetailStockEvent.offer_id == RetailOffer.id)
+        .where(RetailOffer.retailer_id == r.id, RetailStockEvent.detected_to_alert_ms.is_not(None))
+    )
     return {
         "id": r.id, "code": r.code, "name": r.name,
         "base_url": r.base_url, "sitemap_url": r.sitemap_url,
+        "availability_endpoint": bool(r.availability_url_template),
         "is_active": bool(r.is_active),
         "enabled": bool(get_setting(f"retail_{r.code}_enabled", default=False)),
         "error_count": politeness.retailer_error_count(db, r.code),
         "circuit_open": politeness.is_retailer_blocked(db, r.code, now),
+        "avg_latency_ms": int(avg_latency) if avg_latency is not None else None,
         "offers": db.scalar(
             select(func.count()).select_from(RetailOffer).where(RetailOffer.retailer_id == r.id)
         ) or 0,
@@ -353,6 +361,7 @@ def list_retailers(db: Session = Depends(get_db)) -> list[dict]:
 class RetailerUpdate(BaseModel):
     is_active: bool | None = None
     sitemap_url: str | None = None
+    availability_url_template: str | None = None
     reset_circuit: bool | None = None
 
 
@@ -365,6 +374,8 @@ def update_retailer(retailer_id: int, payload: RetailerUpdate, db: Session = Dep
         r.is_active = 1 if payload.is_active else 0
     if payload.sitemap_url is not None:
         r.sitemap_url = payload.sitemap_url.strip() or None
+    if payload.availability_url_template is not None:
+        r.availability_url_template = payload.availability_url_template.strip() or None
     if payload.reset_circuit:
         politeness.clear_retailer_errors(db, r.code)
     db.commit()
@@ -378,7 +389,7 @@ def _offer_dict(o: RetailOffer, retailer_name: str | None = None, flip: dict | N
         "stock_state": o.current_stock_state,
         "price": float(o.current_price) if o.current_price is not None else None,
         "currency": o.currency, "is_watched": bool(o.is_watched),
-        "product_id": o.product_id,
+        "watch_tier": o.watch_tier, "product_id": o.product_id,
         "last_checked_at": o.last_checked_at.isoformat() if o.last_checked_at else None,
         "last_changed_at": o.last_changed_at.isoformat() if o.last_changed_at else None,
         **(flip or {}),
@@ -409,7 +420,11 @@ def list_offers(watched: bool = True, db: Session = Depends(get_db)) -> list[dic
 
 
 class OfferWatchUpdate(BaseModel):
-    is_watched: bool
+    is_watched: bool | None = None
+    watch_tier: str | None = None
+
+
+_TIERS = {"hot", "normal", "cold"}
 
 
 @router.put("/retail/offers/{offer_id}")
@@ -417,9 +432,23 @@ def update_offer(offer_id: int, payload: OfferWatchUpdate, db: Session = Depends
     o = db.get(RetailOffer, offer_id)
     if o is None:
         raise HTTPException(status_code=404, detail="Offre inconnue")
-    o.is_watched = 1 if payload.is_watched else 0
+    if payload.is_watched is not None:
+        o.is_watched = 1 if payload.is_watched else 0
+    if payload.watch_tier is not None:
+        if payload.watch_tier not in _TIERS:
+            raise HTTPException(status_code=400, detail="Tier invalide (hot|normal|cold)")
+        o.watch_tier = payload.watch_tier
     db.commit()
-    return {"id": offer_id, "is_watched": bool(o.is_watched), "status": "ok"}
+    return {"id": offer_id, "is_watched": bool(o.is_watched), "watch_tier": o.watch_tier, "status": "ok"}
+
+
+@router.post("/retail/offers/{offer_id}/recheck")
+def recheck_offer_now(offer_id: int, background: BackgroundTasks,
+                      db: Session = Depends(get_db)) -> dict:
+    """Déclencheur de re-check immédiat (manuel/communautaire), hors cadence tier."""
+    from app.services.retail_jobs import recheck_offer
+
+    return recheck_offer(db, offer_id)
 
 
 @router.delete("/retail/offers/{offer_id}")

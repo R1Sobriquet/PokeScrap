@@ -196,6 +196,28 @@ CREATE TABLE IF NOT EXISTS match_review (
 """
 
 
+def _add_col(conn, db_name: str, table: str, column: str, ddl: str) -> None:
+    """ALTER ADD COLUMN gardé par information_schema (idempotent)."""
+    exists = conn.execute(text(
+        "SELECT COUNT(*) FROM information_schema.columns WHERE table_schema = :db "
+        "AND table_name = :t AND column_name = :c"
+    ), {"db": db_name, "t": table, "c": column}).scalar()
+    if not exists:
+        conn.execute(text(ddl))
+        logger.info("Migration : colonne %s.%s ajoutée.", table, column)
+
+
+def _add_index(conn, db_name: str, table: str, index: str, ddl: str) -> None:
+    """ALTER ADD INDEX gardé par information_schema (idempotent)."""
+    exists = conn.execute(text(
+        "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = :db "
+        "AND table_name = :t AND index_name = :i"
+    ), {"db": db_name, "t": table, "i": index}).scalar()
+    if not exists:
+        conn.execute(text(ddl))
+        logger.info("Migration : index %s.%s ajouté.", table, index)
+
+
 def ensure_schema_upgrades(engine: Engine) -> None:
     """Applique les upgrades manquants (MySQL uniquement)."""
     if engine.dialect.name != "mysql":
@@ -274,3 +296,15 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                 "ALTER TABLE sourcing_listings ADD COLUMN image_url VARCHAR(768) NULL AFTER location"
             ))
             logger.info("Migration : colonne sourcing_listings.image_url ajoutée.")
+
+        # PokéStock FR Phase A — hot-list, ETag, latence, endpoint dispo.
+        _add_col(conn, db_name, "retail_offers", "watch_tier",
+                 "ALTER TABLE retail_offers ADD COLUMN watch_tier VARCHAR(8) NOT NULL DEFAULT 'normal' AFTER is_watched")
+        _add_col(conn, db_name, "retail_offers", "availability_etag",
+                 "ALTER TABLE retail_offers ADD COLUMN availability_etag VARCHAR(255) NULL")
+        _add_index(conn, db_name, "retail_offers", "idx_offer_tier_watched",
+                   "ALTER TABLE retail_offers ADD INDEX idx_offer_tier_watched (watch_tier, is_watched)")
+        _add_col(conn, db_name, "retail_stock_events", "detected_to_alert_ms",
+                 "ALTER TABLE retail_stock_events ADD COLUMN detected_to_alert_ms INT NULL")
+        _add_col(conn, db_name, "retailers", "availability_url_template",
+                 "ALTER TABLE retailers ADD COLUMN availability_url_template VARCHAR(512) NULL AFTER sitemap_url")

@@ -8,12 +8,13 @@ fonctions pures de ``parse``/``sitemap``.
 
 from __future__ import annotations
 
+import json
 from collections.abc import Callable, Iterable
 
 import httpx
 
 from app.retail.domain import OfferSnapshot, Retailer, SkuRef
-from app.retail.parse import parse_offer
+from app.retail.parse import parse_availability_json, parse_offer
 from app.retail.politeness import default_headers
 from app.retail.ports import RetailSourcePort
 from app.retail.sitemap import filter_product_skus, parse_sitemap
@@ -59,6 +60,34 @@ class HttpRetailSource(RetailSourcePort):
     def fetch_offer(self, url: str) -> OfferSnapshot:
         text, _ = self._guarded_get(url)
         return parse_offer(text, url)
+
+    def fetch_availability(self, url: str, *, template: str | None = None,
+                           sku: str | None = None, etag: str | None = None):
+        """Dispo via endpoint XHR JSON (léger) si ``template`` fourni, sinon fetch
+        de la page. Requête conditionnelle ETag : 304 → ``(None, etag)`` (inchangé,
+        on saute le parsing). Renvoie ``(OfferSnapshot | None, new_etag)``."""
+        if not template:
+            return self.fetch_offer(url), None
+        avail_url = template.replace("{sku}", str(sku or "")).replace("{url}", url)
+        headers = {**default_headers(), "Accept": "application/json"}
+        if etag:
+            headers["If-None-Match"] = etag
+        status, text, resp_headers = self._get(avail_url, headers)
+        reason = classify_block(status, text)
+        if reason:
+            raise RetailBlocked(reason, status)
+        if status == 304:  # inchangé depuis le dernier check → économie d'octets
+            return None, etag
+        if status >= 400:
+            raise RetailBlocked(f"http_{status}", status)
+        new_etag = resp_headers.get("etag")
+        try:
+            data = json.loads(text) if text else None
+        except (ValueError, TypeError):
+            data = None
+        if data is None:  # endpoint a renvoyé du non-JSON → robustesse : page
+            return parse_offer(text, url) if text else self.fetch_offer(url), new_etag
+        return parse_availability_json(data, url), new_etag
 
     def list_catalog_skus(self, retailer: Retailer | None = None) -> Iterable[SkuRef]:
         """Lit le sitemap (recurse 1 niveau sur un index) et filtre les URLs produits."""
