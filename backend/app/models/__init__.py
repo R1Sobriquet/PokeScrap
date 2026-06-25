@@ -6,6 +6,8 @@ tables exploitées par les jalons en cours (le reste viendra au fil des jalons).
 
 from app.models.account_snapshot import AccountSnapshot
 from app.models.alert import Alert
+from app.models.buy_attempt import BuyAttempt
+from app.models.buy_rule import BuyRule
 from app.models.grading_opportunity import GradingOpportunity
 from app.models.job_run import JobRun
 from app.models.data_quarantine import DataQuarantine
@@ -14,6 +16,7 @@ from app.models.lot_item import LotItem
 from app.models.market_price_snapshot import MarketPriceSnapshot
 from app.models.match_review import MatchReview
 from app.models.ml_model import MlModel
+from app.models.offer_store_availability import OfferStoreAvailability
 from app.models.position import Position
 from app.models.price_snapshot import PriceSnapshot
 from app.models.product import Product
@@ -24,6 +27,7 @@ from app.models.retail_stock_event import RetailStockEvent
 from app.models.retailer import Retailer
 from app.models.setting import Setting
 from app.models.sourcing_listing import SourcingListing
+from app.models.store_location import StoreLocation
 from app.models.tier import TierConfig
 from app.models.tracked_set import TrackedSet
 from app.models.transaction import Transaction
@@ -32,6 +36,8 @@ from app.models.watchlist import Watchlist
 __all__ = [
     "AccountSnapshot",
     "Alert",
+    "BuyAttempt",
+    "BuyRule",
     "DataQuarantine",
     "GradingOpportunity",
     "JobRun",
@@ -40,6 +46,7 @@ __all__ = [
     "MarketPriceSnapshot",
     "MatchReview",
     "MlModel",
+    "OfferStoreAvailability",
     "Position",
     "PriceSnapshot",
     "Product",
@@ -50,6 +57,7 @@ __all__ = [
     "Retailer",
     "Setting",
     "SourcingListing",
+    "StoreLocation",
     "TierConfig",
     "TrackedSet",
     "Transaction",

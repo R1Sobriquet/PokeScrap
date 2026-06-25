@@ -26,6 +26,16 @@ export default function Retailers() {
         <Badge severity={r.enabled ? "info" : "warning"}>{r.enabled ? "activé" : "off"}</Badge>
       ) },
     { key: "offers", label: "Offres", render: (r) => r.offers },
+    { key: "endpoint", label: "Endpoint dispo", render: (r) => (
+        <Badge severity={r.availability_endpoint ? "info" : "warning"}>
+          {r.availability_endpoint ? "direct" : "page"}
+        </Badge>
+      ) },
+    { key: "latency", label: "Latence détec→alerte", render: (r) => (
+        <span className="font-mono text-xs text-slate-400">
+          {r.avg_latency_ms != null ? `${r.avg_latency_ms} ms` : "—"}
+        </span>
+      ) },
     { key: "circuit", label: "Circuit breaker", render: (r) => (
         r.circuit_open
           ? <Badge severity="critical">ouvert ({r.error_count} err)</Badge>

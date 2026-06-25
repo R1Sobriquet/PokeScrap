@@ -21,11 +21,12 @@ const JOB_LABELS = {
   "match-products": "Matcher les produits",
   "source-health-check": "Check santé des sources",
   "flip-radar-scan": "Flip Radar (opportunités)",
+  "retail-check-store-stock": "Dispo en magasin",
 };
 const ORDER = ["sync-tracked-sets", "refresh-prices", "scan-movers", "evaluate-sales", "kpi-snapshot",
   "retail-check-restocks", "retail-detect-new-skus", "retail-refresh-prices", "retail-backfill-images",
   "train-release-model", "market-snapshot-daily", "calendar-sync", "match-products", "source-health-check",
-  "flip-radar-scan"];
+  "flip-radar-scan", "retail-check-store-stock"];
 const QUOTA_WARN = 200;  // > X produits suivis : risque de dépasser le quota Free (250/j)
 
 function sevFor(status) {

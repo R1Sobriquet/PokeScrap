@@ -15,11 +15,15 @@ from app.auth.security import get_current_user
 from app.config import get_setting, invalidate_setting
 from app.db import get_db
 from app.models import (
+    BuyAttempt,
+    BuyRule,
+    OfferStoreAvailability,
     Release,
     RetailOffer,
     RetailStockEvent,
     Retailer,
     Setting,
+    StoreLocation,
     TrackedSet,
     Watchlist,
 )
@@ -331,13 +335,21 @@ def _utcnow():
 
 def _retailer_dict(r: Retailer, db: Session) -> dict:
     now = _utcnow()
+    # Latence in-pipeline moyenne (détection→alerte) sur les events récents.
+    avg_latency = db.scalar(
+        select(func.avg(RetailStockEvent.detected_to_alert_ms))
+        .select_from(RetailStockEvent).join(RetailOffer, RetailStockEvent.offer_id == RetailOffer.id)
+        .where(RetailOffer.retailer_id == r.id, RetailStockEvent.detected_to_alert_ms.is_not(None))
+    )
     return {
         "id": r.id, "code": r.code, "name": r.name,
         "base_url": r.base_url, "sitemap_url": r.sitemap_url,
+        "availability_endpoint": bool(r.availability_url_template),
         "is_active": bool(r.is_active),
         "enabled": bool(get_setting(f"retail_{r.code}_enabled", default=False)),
         "error_count": politeness.retailer_error_count(db, r.code),
         "circuit_open": politeness.is_retailer_blocked(db, r.code, now),
+        "avg_latency_ms": int(avg_latency) if avg_latency is not None else None,
         "offers": db.scalar(
             select(func.count()).select_from(RetailOffer).where(RetailOffer.retailer_id == r.id)
         ) or 0,
@@ -353,6 +365,7 @@ def list_retailers(db: Session = Depends(get_db)) -> list[dict]:
 class RetailerUpdate(BaseModel):
     is_active: bool | None = None
     sitemap_url: str | None = None
+    availability_url_template: str | None = None
     reset_circuit: bool | None = None
 
 
@@ -365,6 +378,8 @@ def update_retailer(retailer_id: int, payload: RetailerUpdate, db: Session = Dep
         r.is_active = 1 if payload.is_active else 0
     if payload.sitemap_url is not None:
         r.sitemap_url = payload.sitemap_url.strip() or None
+    if payload.availability_url_template is not None:
+        r.availability_url_template = payload.availability_url_template.strip() or None
     if payload.reset_circuit:
         politeness.clear_retailer_errors(db, r.code)
     db.commit()
@@ -378,7 +393,7 @@ def _offer_dict(o: RetailOffer, retailer_name: str | None = None, flip: dict | N
         "stock_state": o.current_stock_state,
         "price": float(o.current_price) if o.current_price is not None else None,
         "currency": o.currency, "is_watched": bool(o.is_watched),
-        "product_id": o.product_id,
+        "watch_tier": o.watch_tier, "product_id": o.product_id,
         "last_checked_at": o.last_checked_at.isoformat() if o.last_checked_at else None,
         "last_changed_at": o.last_changed_at.isoformat() if o.last_changed_at else None,
         **(flip or {}),
@@ -409,7 +424,11 @@ def list_offers(watched: bool = True, db: Session = Depends(get_db)) -> list[dic
 
 
 class OfferWatchUpdate(BaseModel):
-    is_watched: bool
+    is_watched: bool | None = None
+    watch_tier: str | None = None
+
+
+_TIERS = {"hot", "normal", "cold"}
 
 
 @router.put("/retail/offers/{offer_id}")
@@ -417,9 +436,164 @@ def update_offer(offer_id: int, payload: OfferWatchUpdate, db: Session = Depends
     o = db.get(RetailOffer, offer_id)
     if o is None:
         raise HTTPException(status_code=404, detail="Offre inconnue")
-    o.is_watched = 1 if payload.is_watched else 0
+    if payload.is_watched is not None:
+        o.is_watched = 1 if payload.is_watched else 0
+    if payload.watch_tier is not None:
+        if payload.watch_tier not in _TIERS:
+            raise HTTPException(status_code=400, detail="Tier invalide (hot|normal|cold)")
+        o.watch_tier = payload.watch_tier
     db.commit()
-    return {"id": offer_id, "is_watched": bool(o.is_watched), "status": "ok"}
+    return {"id": offer_id, "is_watched": bool(o.is_watched), "watch_tier": o.watch_tier, "status": "ok"}
+
+
+@router.post("/retail/offers/{offer_id}/recheck")
+def recheck_offer_now(offer_id: int, background: BackgroundTasks,
+                      db: Session = Depends(get_db)) -> dict:
+    """Déclencheur de re-check immédiat (manuel/communautaire), hors cadence tier."""
+    from app.services.retail_jobs import recheck_offer
+
+    return recheck_offer(db, offer_id)
+
+
+# --------------------------------------------------- Phase B : magasins
+@router.get("/retail/stores")
+def list_stores(db: Session = Depends(get_db)) -> list[dict]:
+    names = {r.id: r.name for r in db.scalars(select(Retailer)).all()}
+    rows = db.scalars(select(StoreLocation).order_by(StoreLocation.retailer_id, StoreLocation.name)).all()
+    return [{
+        "id": s.id, "retailer_id": s.retailer_id, "retailer": names.get(s.retailer_id),
+        "store_code": s.store_code, "name": s.name, "city": s.city, "postal": s.postal,
+        "is_watched": bool(s.is_watched),
+    } for s in rows]
+
+
+class StoreUpdate(BaseModel):
+    is_watched: bool
+
+
+@router.put("/retail/stores/{store_id}")
+def update_store(store_id: int, payload: StoreUpdate, db: Session = Depends(get_db)) -> dict:
+    s = db.get(StoreLocation, store_id)
+    if s is None:
+        raise HTTPException(status_code=404, detail="Magasin inconnu")
+    s.is_watched = 1 if payload.is_watched else 0
+    db.commit()
+    return {"id": store_id, "is_watched": bool(s.is_watched), "status": "ok"}
+
+
+# --------------------------------------------------- Phase C : achat assisté
+def _rule_dict(r: BuyRule) -> dict:
+    return {
+        "id": r.id, "scope": r.scope, "scope_value": r.scope_value,
+        "retailer_id": r.retailer_id, "max_price": float(r.max_price),
+        "max_quantity": r.max_quantity, "is_enabled": bool(r.is_enabled),
+    }
+
+
+@router.get("/buy-rules")
+def list_buy_rules(db: Session = Depends(get_db)) -> list[dict]:
+    return [_rule_dict(r) for r in db.scalars(select(BuyRule).order_by(BuyRule.id.desc())).all()]
+
+
+class BuyRuleIn(BaseModel):
+    scope: str = "offer"
+    scope_value: str
+    retailer_id: int | None = None
+    max_price: float
+    max_quantity: int = 1
+    is_enabled: bool = False
+
+
+@router.post("/buy-rules")
+def create_buy_rule(payload: BuyRuleIn, db: Session = Depends(get_db)) -> dict:
+    if payload.scope not in ("offer", "product_type"):
+        raise HTTPException(status_code=400, detail="scope invalide (offer|product_type)")
+    if payload.max_price <= 0 or payload.max_quantity < 1:
+        raise HTTPException(status_code=400, detail="Plafond prix > 0 et quantité ≥ 1 requis")
+    r = BuyRule(scope=payload.scope, scope_value=str(payload.scope_value).strip(),
+                retailer_id=payload.retailer_id, max_price=payload.max_price,
+                max_quantity=payload.max_quantity, is_enabled=1 if payload.is_enabled else 0)
+    db.add(r)
+    db.commit()
+    return _rule_dict(r)
+
+
+class BuyRuleUpdate(BaseModel):
+    max_price: float | None = None
+    max_quantity: int | None = None
+    is_enabled: bool | None = None
+
+
+@router.put("/buy-rules/{rule_id}")
+def update_buy_rule(rule_id: int, payload: BuyRuleUpdate, db: Session = Depends(get_db)) -> dict:
+    r = db.get(BuyRule, rule_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Règle inconnue")
+    if payload.max_price is not None:
+        if payload.max_price <= 0:
+            raise HTTPException(status_code=400, detail="Plafond prix > 0 requis")
+        r.max_price = payload.max_price
+    if payload.max_quantity is not None:
+        r.max_quantity = max(1, payload.max_quantity)
+    if payload.is_enabled is not None:
+        r.is_enabled = 1 if payload.is_enabled else 0
+    db.commit()
+    return _rule_dict(r)
+
+
+@router.delete("/buy-rules/{rule_id}")
+def delete_buy_rule(rule_id: int, db: Session = Depends(get_db)) -> dict:
+    r = db.get(BuyRule, rule_id)
+    if r is None:
+        raise HTTPException(status_code=404, detail="Règle inconnue")
+    db.delete(r)
+    db.commit()
+    return {"id": rule_id, "status": "deleted"}
+
+
+@router.get("/buy-attempts")
+def list_buy_attempts(db: Session = Depends(get_db)) -> list[dict]:
+    rows = db.scalars(select(BuyAttempt).order_by(BuyAttempt.id.desc()).limit(100)).all()
+    return [{
+        "id": a.id, "offer_id": a.offer_id, "channel": a.channel, "status": a.status,
+        "cart_url": a.cart_url, "reason": a.reason,
+        "created_at": a.created_at.isoformat() if a.created_at else None,
+    } for a in rows]
+
+
+@router.post("/retail/offers/{offer_id}/buy")
+def assisted_buy_now(offer_id: int, db: Session = Depends(get_db)) -> dict:
+    """Déclenche l'achat ASSISTÉ d'une offre (allow-list + garde-fous). Jamais de paiement."""
+    from app.services.assisted_buy import attempt_buy
+
+    offer = db.get(RetailOffer, offer_id)
+    if offer is None:
+        raise HTTPException(status_code=404, detail="Offre inconnue")
+    retailer = db.get(Retailer, offer.retailer_id)
+    return attempt_buy(db, offer=offer, retailer=retailer)
+
+
+@router.get("/retail/store-availability")
+def store_availability(offer_id: int | None = None, db: Session = Depends(get_db)) -> list[dict]:
+    """Dispo par (offre, magasin) — vue de l'écran magasins."""
+    stores = {s.id: s for s in db.scalars(select(StoreLocation)).all()}
+    offers = {o.id: o for o in db.scalars(select(RetailOffer)).all()}
+    stmt = select(OfferStoreAvailability)
+    if offer_id is not None:
+        stmt = stmt.where(OfferStoreAvailability.offer_id == offer_id)
+    out = []
+    for a in db.scalars(stmt.order_by(OfferStoreAvailability.last_changed_at.desc().nullslast())).all():
+        st = stores.get(a.store_id)
+        of = offers.get(a.offer_id)
+        out.append({
+            "offer_id": a.offer_id, "store_id": a.store_id,
+            "title": of.title if of else None,
+            "store": st.name if st else None, "city": st.city if st else None,
+            "availability_state": a.availability_state,
+            "price": float(a.price) if a.price is not None else None,
+            "last_changed_at": a.last_changed_at.isoformat() if a.last_changed_at else None,
+        })
+    return out
 
 
 @router.delete("/retail/offers/{offer_id}")

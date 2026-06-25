@@ -362,6 +362,10 @@ CREATE TABLE retailers (
     name         VARCHAR(128) NOT NULL,
     base_url     VARCHAR(255) NULL,
     sitemap_url  VARCHAR(512) NULL,
+    availability_url_template VARCHAR(512) NULL,
+    store_availability_url_template VARCHAR(512) NULL,
+    cart_add_url_template VARCHAR(512) NULL,
+    cart_view_url VARCHAR(512) NULL,
     is_active    TINYINT(1)   NOT NULL DEFAULT 1,
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
@@ -381,6 +385,8 @@ CREATE TABLE retail_offers (
     current_price       DECIMAL(8,2) NULL,
     currency            CHAR(3)      NOT NULL DEFAULT 'EUR',
     is_watched          TINYINT(1)   NOT NULL DEFAULT 0,
+    watch_tier          VARCHAR(8)   NOT NULL DEFAULT 'normal',
+    availability_etag   VARCHAR(255) NULL,
     product_id          BIGINT UNSIGNED NULL,
     first_seen_at       DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     last_checked_at     DATETIME     NULL,
@@ -388,6 +394,7 @@ CREATE TABLE retail_offers (
     PRIMARY KEY (id),
     UNIQUE KEY uq_retail_offer_url (url),
     KEY idx_retailer_watched (retailer_id, is_watched),
+    KEY idx_offer_tier_watched (watch_tier, is_watched),
     KEY idx_stock_state (current_stock_state),
     CONSTRAINT fk_offer_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE CASCADE,
     CONSTRAINT fk_offer_product  FOREIGN KEY (product_id)  REFERENCES products (id)  ON DELETE SET NULL
@@ -400,10 +407,71 @@ CREATE TABLE retail_stock_events (
     from_state  VARCHAR(16)  NULL,
     to_state    VARCHAR(16)  NOT NULL,
     price       DECIMAL(8,2) NULL,
+    store_id    BIGINT UNSIGNED NULL,
+    detected_to_alert_ms INT    NULL,
     detected_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
     KEY idx_offer_detected (offer_id, detected_at),
     CONSTRAINT fk_event_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------- PokéStock FR Phase B : store_locations ---------
+CREATE TABLE store_locations (
+    id          BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    retailer_id BIGINT UNSIGNED NOT NULL,
+    store_code  VARCHAR(64)  NOT NULL,
+    name        VARCHAR(128) NOT NULL,
+    city        VARCHAR(96)  NULL,
+    postal      VARCHAR(16)  NULL,
+    is_watched  TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at  DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_store_retailer_code (retailer_id, store_code),
+    CONSTRAINT fk_store_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------- PokéStock FR Phase B : offer_store_availability ------
+CREATE TABLE offer_store_availability (
+    id                 BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    offer_id           BIGINT UNSIGNED NOT NULL,
+    store_id           BIGINT UNSIGNED NOT NULL,
+    availability_state ENUM('in_store','out_of_store','limited','unknown') NOT NULL DEFAULT 'unknown',
+    price              DECIMAL(8,2) NULL,
+    last_checked_at    DATETIME NULL,
+    last_changed_at    DATETIME NULL,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_offer_store (offer_id, store_id),
+    CONSTRAINT fk_osa_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE,
+    CONSTRAINT fk_osa_store FOREIGN KEY (store_id) REFERENCES store_locations (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------------ PokéStock FR Phase C : buy_rules ----------
+CREATE TABLE buy_rules (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    scope        ENUM('offer','product_type') NOT NULL,
+    scope_value  VARCHAR(64)  NOT NULL,
+    retailer_id  BIGINT UNSIGNED NULL,
+    max_price    DECIMAL(8,2) NOT NULL,
+    max_quantity INT          NOT NULL DEFAULT 1,
+    is_enabled   TINYINT(1)   NOT NULL DEFAULT 0,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_buy_rule_scope (scope, scope_value),
+    CONSTRAINT fk_buyrule_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ---------------------- PokéStock FR Phase C : buy_attempts ---------
+CREATE TABLE buy_attempts (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    offer_id   BIGINT UNSIGNED NOT NULL,
+    channel    ENUM('online','store') NOT NULL DEFAULT 'online',
+    status     ENUM('carted','blocked','skipped','dry_run') NOT NULL,
+    cart_url   VARCHAR(512) NULL,
+    reason     VARCHAR(128) NULL,
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_buy_attempt_offer (offer_id, created_at),
+    CONSTRAINT fk_buyattempt_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------- PokéStock FR : releases ----------------

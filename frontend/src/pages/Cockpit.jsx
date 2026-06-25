@@ -4,12 +4,16 @@ import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { eur, pct } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
+import HoloCard from "../components/HoloCard.jsx";
+import { CountUp, Confetti } from "../components/motion.jsx";
+
+const money = (v) => `${(Number(v) || 0).toFixed(2)} €`;
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
 // Carte « jauge » du design : label mono, pastille d'état, grande valeur mono,
 // barre de progression animée, légende.
-function GaugeCard({ label, value, pill, pillColor, pillBg, barPct, barGrad, caption }) {
+function GaugeCard({ label, value, count, fmt, pill, pillColor, pillBg, barPct, barGrad, caption }) {
   return (
     <div className="rounded-2xl p-5 transition-colors" style={panel}>
       <div className="flex items-center justify-between">
@@ -20,7 +24,9 @@ function GaugeCard({ label, value, pill, pillColor, pillBg, barPct, barGrad, cap
           </div>
         )}
       </div>
-      <div className="mt-3 font-mono text-[28px] font-bold leading-none">{value}</div>
+      <div className="mt-3 font-mono text-[28px] font-bold leading-none">
+        {count != null ? <CountUp value={count} format={fmt} /> : value}
+      </div>
       <div className="mt-3 h-1 overflow-hidden rounded" style={{ background: "var(--bar)" }}>
         <div
           style={{
@@ -34,6 +40,15 @@ function GaugeCard({ label, value, pill, pillColor, pillBg, barPct, barGrad, cap
         />
       </div>
       {caption && <div className="mt-2.5 text-[12.5px] text-slate-500">{caption}</div>}
+    </div>
+  );
+}
+
+function Stat({ label, value, color }) {
+  return (
+    <div>
+      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div className="mt-0.5 font-mono text-[18px] font-bold" style={color ? { color } : undefined}>{value}</div>
     </div>
   );
 }
@@ -60,6 +75,7 @@ export default function Cockpit() {
   const { data, loading } = usePolling("/cockpit");
   const { data: movers } = usePolling("/movers");
   const { data: sets } = usePolling("/tracked-sets", { intervalSec: 120 });
+  const { data: opps } = usePolling("/retail/opportunities", { intervalSec: 90 });
   const { t } = useI18n();
   const navigate = useNavigate();
   if (loading || !data) return <p className="text-slate-400">{t("common.loading")}</p>;
@@ -68,6 +84,10 @@ export default function Cockpit() {
   const a = data.allocation;
   const profitUp = (k.realized_profit_net ?? 0) >= 0;
   const investedPct = k.total_portfolio_value ? (k.capital_invested / k.total_portfolio_value) * 100 : 0;
+  const deal = (opps || [])[0];
+  const dealAccent = deal
+    ? (deal.verdict_tone === "buy" ? "#1E7A4D" : deal.verdict_tone === "pass" ? "#7A1220" : "#5B3FA8")
+    : "#5B3FA8";
 
   return (
     <div className="space-y-8">
@@ -83,6 +103,55 @@ export default function Cockpit() {
         </div>
       </div>
 
+      {/* Deal of the Day — carte holo 3D interactive */}
+      <div className="overflow-hidden rounded-2xl" style={{ ...panel, background: "var(--ai-bg)", border: "1px solid var(--ai-border)" }}>
+        <div className="grid items-center gap-2 md:grid-cols-[360px_1fr]">
+          <div className="relative cursor-grab active:cursor-grabbing">
+            <Confetti fire={deal?.verdict === "STRONG BUY"} />
+            <HoloCard
+              accent={dealAccent}
+              height={340}
+              title={deal ? (deal.title || deal.product_name || "Deal") : "Aucun deal"}
+              sub={deal ? (deal.retailer || "—") : "active la veille restock"}
+              price={deal ? eur(deal.retail_price) : "—"}
+              verdict={deal ? deal.verdict : null}
+            />
+          </div>
+          <div className="p-5 pr-7">
+            <div className="font-mono text-[11px] uppercase tracking-[0.16em]" style={{ color: "var(--violet-text)" }}>
+              {t("cockpit.dealOfDay")}
+            </div>
+            {deal ? (
+              <>
+                <div className="mt-2 text-2xl font-extrabold tracking-tight">{deal.title || deal.product_name}</div>
+                <div className="mt-1 font-mono text-[11px] tracking-[0.12em] text-slate-500">{deal.retailer}</div>
+                <div className="mt-4 flex flex-wrap items-center gap-5">
+                  <Stat label="MSRP" value={eur(deal.retail_price)} />
+                  <Stat label={t("cockpit.deal.market")} value={eur(deal.market_value)} />
+                  <Stat label={t("flip.col.upside")} value={`${(deal.net_upside_pct ?? 0) >= 0 ? "+" : ""}${deal.net_upside_pct}%`} color="var(--green-text)" />
+                  <Stat label={t("flip.col.profit")} value={eur(deal.est_profit)} color="var(--gold)" />
+                </div>
+                <div className="mt-5 flex flex-wrap gap-2.5">
+                  <a href={deal.url} target="_blank" rel="noreferrer" className="rounded-xl px-4 py-2.5 text-sm font-bold text-ink"
+                     style={{ background: "linear-gradient(180deg, #FFD75A, #FFC91F)" }}>
+                    {t("cockpit.deal.grab")}
+                  </a>
+                  <button onClick={() => navigate("/flip")} className="rounded-xl px-4 py-2.5 text-sm font-semibold"
+                          style={{ border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--text2)" }}>
+                    {t("cockpit.deal.all")}
+                  </button>
+                </div>
+                <div className="mt-3 font-mono text-[10px] uppercase tracking-[0.12em] text-slate-600">
+                  ✨ {t("cockpit.deal.drag")}
+                </div>
+              </>
+            ) : (
+              <p className="mt-3 max-w-md text-sm text-slate-500">{t("cockpit.deal.empty")}</p>
+            )}
+          </div>
+        </div>
+      </div>
+
       {/* Vue d'ensemble — jauges */}
       <div>
         <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-500">
@@ -91,6 +160,7 @@ export default function Cockpit() {
         <div className="mt-3 grid grid-cols-1 gap-3.5 sm:grid-cols-2 lg:grid-cols-4">
           <GaugeCard
             label={t("cockpit.kpi.portfolio")}
+            count={k.total_portfolio_value} fmt={money}
             value={eur(k.total_portfolio_value)}
             pill={a ? `${pct(a.stock_pct)} ${t("cockpit.pill.stock")}` : null}
             pillColor="var(--blue-soft)"
@@ -101,6 +171,7 @@ export default function Cockpit() {
           />
           <GaugeCard
             label={t("cockpit.kpi.invested")}
+            count={k.capital_invested} fmt={money}
             value={eur(k.capital_invested)}
             pill={`×${k.capital_rotation_rate ?? "—"}`}
             pillColor="var(--yellow-text)"
@@ -111,6 +182,7 @@ export default function Cockpit() {
           />
           <GaugeCard
             label={t("cockpit.kpi.cash")}
+            count={k.cash_total} fmt={money}
             value={eur(k.cash_total)}
             pill={t("cockpit.pill.active")}
             pillColor="var(--green-text)"
@@ -121,6 +193,7 @@ export default function Cockpit() {
           />
           <GaugeCard
             label={t("cockpit.kpi.profit")}
+            count={k.realized_profit_net} fmt={money}
             value={eur(k.realized_profit_net)}
             pill={profitUp ? "▲" : "▼"}
             pillColor={profitUp ? "var(--green-text)" : "var(--red-text)"}

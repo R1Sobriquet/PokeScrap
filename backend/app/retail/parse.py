@@ -185,3 +185,110 @@ def parse_dom_offer(html: str, url: str) -> OfferSnapshot:
 def parse_offer(html: str, url: str) -> OfferSnapshot:
     """JSON-LD prioritaire, fallback DOM si aucun ``Product`` JSON-LD."""
     return parse_jsonld_offer(html, url) or parse_dom_offer(html, url)
+
+
+_AVAIL_IN = ("instock", "in_stock", "available", "disponible", "en_stock", "in stock")
+_AVAIL_OUT = ("outofstock", "out_of_stock", "unavailable", "indisponible", "rupture", "epuise")
+_AVAIL_PRE = ("preorder", "pre_order", "precommande", "preorder")
+
+
+def _avail_str(value) -> str | None:
+    """Mappe une valeur d'availability hétérogène (str/bool/int) → état stock."""
+    if isinstance(value, bool):
+        return IN_STOCK if value else OUT_OF_STOCK
+    if isinstance(value, (int, float)):
+        return IN_STOCK if value > 0 else OUT_OF_STOCK
+    if isinstance(value, str):
+        low = value.strip().lower().replace(" ", "")
+        if any(k.replace(" ", "") in low for k in _AVAIL_PRE):
+            return PREORDER
+        if any(k.replace(" ", "") in low for k in _AVAIL_IN):
+            return IN_STOCK
+        if any(k.replace(" ", "") in low for k in _AVAIL_OUT):
+            return OUT_OF_STOCK
+    return None
+
+
+def parse_availability_json(data, url: str) -> OfferSnapshot:
+    """Parse la réponse de l'endpoint XHR de dispo (formes variées, défensif).
+
+    Cherche un champ de dispo (availability/available/inStock/stock/status) et un
+    prix (price/amount). État inconnu → ``UNKNOWN`` (jamais d'invention)."""
+    node = data
+    if isinstance(data, dict):
+        for wrap in ("data", "product", "result", "offer", "stock"):
+            if isinstance(data.get(wrap), dict):
+                node = data[wrap]
+                break
+    if not isinstance(node, dict):
+        return OfferSnapshot(url=url, stock_state=UNKNOWN, source="json")
+
+    state = None
+    for key in ("availability", "available", "inStock", "in_stock", "stock", "status",
+                "stockStatus", "isAvailable", "quantity", "qty"):
+        if key in node:
+            state = _avail_str(node[key])
+            if state:
+                break
+    price = None
+    for key in ("price", "amount", "salePrice", "currentPrice", "value"):
+        if key in node:
+            price = _to_decimal(node[key])
+            if price is not None:
+                break
+    return OfferSnapshot(url=url, stock_state=state or UNKNOWN, price=price,
+                         currency="EUR", source="json")
+
+
+# Phase B — états dispo MAGASIN (distincts des états online).
+IN_STORE, OUT_OF_STORE, LIMITED, STORE_UNKNOWN = "in_store", "out_of_store", "limited", "unknown"
+_STORE_LIMITED = ("limited", "lowstock", "low_stock", "faible", "dernier", "fewleft")
+# OUT testé AVANT IN ('indisponible' contient 'disponible').
+_STORE_OUT_KW = ("outofstore", "out_of_store", "indisponible", "rupture", "epuise",
+                 "unavailable", "outofstock")
+_STORE_IN_KW = ("instore", "in_store", "instock", "disponible", "available", "enstock",
+                "clickandcollect", "retrait")
+
+
+def parse_store_availability_json(data) -> tuple[str, "Decimal | None"]:
+    """Endpoint dispo MAGASIN (formes variées) → (état magasin, prix).
+
+    États : in_store / limited / out_of_store / unknown. ``limited`` = stock faible.
+    """
+    node = data
+    if isinstance(data, dict):
+        for wrap in ("data", "store", "result", "availability", "stock"):
+            if isinstance(data.get(wrap), dict):
+                node = data[wrap]
+                break
+    if not isinstance(node, dict):
+        return STORE_UNKNOWN, None
+
+    raw = None
+    for key in ("availability", "available", "inStore", "in_store", "stock", "status",
+                "storeStatus", "stockLevel", "quantity", "qty"):
+        if key in node:
+            raw = node[key]
+            break
+    price = None
+    for key in ("price", "amount", "salePrice", "value"):
+        if key in node:
+            price = _to_decimal(node[key])
+            if price is not None:
+                break
+
+    if raw is None:
+        return STORE_UNKNOWN, price
+    low = str(raw).strip().lower().replace(" ", "").replace("-", "")
+    if any(k in low for k in _STORE_LIMITED):
+        return LIMITED, price
+    if any(k in low for k in _STORE_OUT_KW):
+        return OUT_OF_STORE, price
+    if any(k in low for k in _STORE_IN_KW):
+        return IN_STORE, price
+    base = _avail_str(raw)  # repli (bool/int → in/out)
+    if base == IN_STOCK:
+        return IN_STORE, price
+    if base == OUT_OF_STOCK:
+        return OUT_OF_STORE, price
+    return STORE_UNKNOWN, price

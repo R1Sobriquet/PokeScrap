@@ -198,6 +198,16 @@ def flip_radar_scan() -> None:
     logger.info("flip_radar_scan: %s", result.get("summary"))
 
 
+def retail_check_store_stock() -> None:
+    # Phase B — dispo en magasin (zone Agen ; no-op tant que désactivé).
+    from app.services.retail_store_jobs import run_check_store_stock
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_check_store_stock(db)
+    logger.info("retail_check_store_stock: %s", result.get("summary"))
+
+
 def main() -> None:
     scheduler = BlockingScheduler(timezone=TIMEZONE)
     scheduler.add_job(heartbeat, "interval", minutes=1, id="heartbeat")
@@ -230,9 +240,13 @@ def main() -> None:
     # Auto-watchlist par set : 1×/jour (quota). Top movers : après le refresh prix.
     scheduler.add_job(sync_sets, CronTrigger(hour=5, minute=0, timezone=TIMEZONE), id="sync_tracked_sets")
     scheduler.add_job(scan_movers, CronTrigger(hour=6, minute=30, timezone=TIMEZONE), id="scan_movers")
-    # PokéStock FR — veille restock (prudent) : check watchlist toutes les 30 min,
-    # radar nouveaux SKU 2×/jour. No-op tant que retail_sourcing_enabled=false.
-    scheduler.add_job(retail_check_restocks, "interval", minutes=30, id="retail_check_restocks")
+    # PokéStock FR Phase A — poll court (agressif sur le planning) ; la CADENCE
+    # RÉELLE par offre est pilotée par son tier (hot/normal/cold). No-op tant que
+    # retail_sourcing_enabled=false. Tier hot ~45 s, normal ~5 min, cold ~horaire.
+    poll_sec = int(os.getenv("RETAIL_POLL_INTERVAL_SEC", "45"))
+    scheduler.add_job(retail_check_restocks, "interval", seconds=poll_sec, id="retail_check_restocks")
+    # Dispo magasin (Phase B) : cadence lente (offres×magasins explose vite).
+    scheduler.add_job(retail_check_store_stock, "interval", minutes=20, id="retail_check_store_stock")
     scheduler.add_job(
         retail_detect_new_skus,
         CronTrigger(hour="7,19", minute=15, timezone=TIMEZONE),

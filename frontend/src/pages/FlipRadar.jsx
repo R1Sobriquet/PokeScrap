@@ -1,7 +1,47 @@
+import { ResponsiveContainer, Treemap } from "recharts";
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { PageHeader, eur } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
+
+const TONE_FILL = { buy: "#1E7A4D", fair: "#2E5FD6", pass: "#7A1220" };
+
+function MoneyCell({ x, y, width, height, name, tone, upside }) {
+  if (width < 4 || height < 4) return null;
+  return (
+    <g>
+      <rect x={x} y={y} width={width} height={height} rx={6}
+        style={{ fill: TONE_FILL[tone] || "#2E5FD6", stroke: "var(--bg)", strokeWidth: 2, opacity: 0.92 }} />
+      {width > 64 && height > 30 && (
+        <>
+          <text x={x + 8} y={y + 18} fill="#fff" fontSize={11} fontWeight="700" style={{ pointerEvents: "none" }}>
+            {(name || "").slice(0, Math.floor(width / 7))}
+          </text>
+          <text x={x + 8} y={y + 34} fill="rgba(255,255,255,.85)" fontSize={10} fontFamily="JetBrains Mono" style={{ pointerEvents: "none" }}>
+            {upside >= 0 ? "+" : ""}{upside}%
+          </text>
+        </>
+      )}
+    </g>
+  );
+}
+
+function MoneyMap({ opps, t }) {
+  const data = (opps || [])
+    .map((o) => ({ name: o.title || o.product_name || "—", tone: o.verdict_tone,
+      upside: o.net_upside_pct ?? 0, size: Math.max(1, o.est_profit ?? o.net_upside_pct ?? 1) }))
+    .filter((d) => d.size > 0);
+  if (data.length === 0) return null;
+  return (
+    <div className="overflow-hidden rounded-2xl p-4" style={{ background: "var(--panel)", border: "1px solid var(--border)" }}>
+      <div className="mb-2 font-mono text-[11px] uppercase tracking-[0.16em] text-slate-500">{t("flip.map")}</div>
+      <ResponsiveContainer width="100%" height={220}>
+        <Treemap data={data} dataKey="size" stroke="var(--bg)" isAnimationActive
+          content={<MoneyCell />} />
+      </ResponsiveContainer>
+    </div>
+  );
+}
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 const GRID = "32px minmax(0,1fr) 92px 116px 74px 78px 96px 86px 108px";
@@ -34,6 +74,8 @@ export default function FlipRadar() {
   return (
     <div className="space-y-5">
       <PageHeader title={t("flip.title")} subtitle={t("flip.subtitle")} badge="POKÉSTOCK FR · FLIP" />
+
+      <MoneyMap opps={list} t={t} />
 
       <div className="overflow-hidden rounded-2xl" style={panel}>
         <div

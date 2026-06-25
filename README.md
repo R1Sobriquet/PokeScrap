@@ -147,6 +147,79 @@ Discord/Telegram porte le verdict. Réglage `restock_min_flip_pct` : seul un fli
 digest) → on n'est pingé que sur les vrais coups. Verdict **net de frais**
 (`resale_fee_pct`) — un +12% brut peut être nul après frais.
 
+### Phase A — latence de détection online
+
+Agressif sur le **planning**, léger sur les **requêtes** :
+- **Hot-list à 3 niveaux** (`retail_offers.watch_tier` : `hot`/`normal`/`cold`) :
+  le job de poll tourne court (`RETAIL_POLL_INTERVAL_SEC`, ~45 s) mais chaque
+  offre n'est checkée qu'à l'intervalle de son tier (`retail_tier_hot_sec`,
+  `retail_tier_normal_min`, `retail_tier_cold_min`). Le budget part sur le `hot`.
+- **Endpoint XHR de dispo > page** : `retailers.availability_url_template`
+  (`{sku}`/`{url}`) → JSON léger parsé en priorité, fallback page si absent. À
+  **confirmer par enseigne au go-live** (comme `sitemap_url`) ; vide par défaut.
+- **Requête conditionnelle ETag** : `If-None-Match` → `304` = inchangé, on saute
+  le parsing (économie d'octets).
+- **Anti-ban** : **token bucket par enseigne** (capacité/recharge en `settings`)
+  + jitter + circuit breaker/backoff exponentiel sur 403/429 (réutilise
+  `scrape_state`). Fnac : `hot` sur un set minuscule.
+- **Latence instrumentée** : `retail_stock_events.detected_to_alert_ms`, moyenne
+  par enseigne affichée sur l'écran **Détaillants**.
+- **Déclencheur de re-check immédiat** : `POST /retail/offers/{id}/recheck`
+  (bouton ↻) hors cadence tier ; un consommateur RSS/webhook reste un point
+  d'extension off-by-default.
+
+**Honnêteté** : depuis une IP maison, détection en **dizaines de secondes** sur
+le `hot`, pas en temps réel. Battre des bots à fermes de proxys résidentiels est
+**hors scope** — on vise « plus rapide qu'un humain qui navigue ».
+
+### Phase B — dispo en magasin (zone Agen)
+
+Réassort **physique** via le widget « disponible en magasin / click & collect »
+des enseignes, pour quelques magasins près d'Agen (pas de traçage logistique).
+- Tables `store_locations` (magasins suivis) + `offer_store_availability` (état
+  par `(offre, magasin)`, upsert idempotent) ; `retail_stock_events.store_id`
+  (online = NULL, magasin = id).
+- Adapter `fetch_store_availability(offre, magasin)` →
+  `retailers.store_availability_url_template` (`{sku}`/`{store_code}`), JSON parsé
+  en `in_store`/`limited`/`out_of_store`, requête conditionnelle ETag. Endpoint +
+  `store_code` réels **confirmés à l'inspection** (NULL ⇒ aucun fetch).
+- Job `retail-check-store-stock` : `watched × watched` uniquement, plafond/run +
+  token bucket + circuit breaker, **cadence lente** (offres × magasins explose) ;
+  transition → `retail_stock_events(store_id)` + **alerte nommant le magasin**
+  (Discord 🏬 + Telegram). Sous `retail_sourcing_enabled` + `retail_store_stock_enabled`
+  + dry-run.
+- Seed zone Agen : Micromania (Agen/Boé, Montauban), Cultura (Agen, Montauban),
+  King Jouet (Boé, Villeneuve) en `is_watched=1` ; JouéClub/La Grande Récré en
+  `is_watched=0` (à vérifier). Écran **Magasins** (toggle + vue dispo).
+
+**Hors pipeline (suivi manuel, indés sans stock en ligne)** : Guyajeux Agen &
+Marmande, La Meeple'rie Villeneuve — Facebook/Instagram uniquement.
+
+**Honnêteté** : la dispo magasin est **retardée et approximative** (le site peut
+dire « dispo » alors que le rayon est vide, et l'inverse) — c'est un indice.
+
+### Phase C — achat ASSISTÉ (jamais automatique)
+
+But : réduire le temps de réaction à quelques secondes. Sur une alerte restock
+d'une offre matchant une `buy_rule` active → **ajout au panier** (sur la session
+connectée de l'utilisateur, cookie en `settings assisted_buy_cookie_<code>`) +
+**deep-link** vers le panier pré-rempli, poussé en alerte « 🛒 Ajouté au panier —
+finalise ici · TU fais le paiement + 3DS ». Audit dans `buy_attempts`.
+
+**Non-objectifs (jamais implémentés, cadrés en dur) :** ❌ paiement automatique
+❌ contournement 3-D Secure / SCA ❌ stockage de moyens de paiement ❌
+contournement anti-bot au checkout. **L'humain finalise toujours le paiement.**
+
+Garde-fous (`app/services/assisted_buy.py`) : **kill-switch** global
+(`assisted_buy_enabled`), **allow-list** (`buy_rules` — rien hors règle active),
+**plafond prix** (anti-scalp : prix gonflé → on ne carte PAS) + **cap quantité**,
+**dry-run** (`assisted_buy_dry_run` : simule + alerte sans carter), **idempotence**
+(pas de double-panier), **audit** complet. Carting bloqué (anti-bot, ex. Fnac) →
+**dégrade en deep-link produit** (`status=blocked`), jamais d'acharnement. Endpoint
+de carting (`retailers.cart_add_url_template`/`cart_view_url`) + session à fournir
+par l'utilisateur ; absents ⇒ deep-link seulement. Écran **Achat assisté** (règles
++ toggles kill-switch/dry-run + journal d'audit).
+
 ### Flip Radar — où est l'argent maintenant
 
 L'écran **Flip Radar** (`/flip`, `app/services/flip_radar.py`) classe en continu

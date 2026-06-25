@@ -56,6 +56,20 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("restock_min_flip_pct", "0", "decimal", "Restock : alerte instantanée seulement si upside NET (marché vs MSRP) ≥ N% (sinon digest)"),
     ("resale_fee_pct", "12", "decimal", "Frais de revente (%) déduits pour le flip net (marketplace + port)"),
     ("flip_alert_min_pct", "25", "decimal", "Flip Radar : alerte proactive si une offre en stock dépasse N% net"),
+    # Phase A — latence online (hot-list à plusieurs niveaux, défauts prudents).
+    ("retail_tier_hot_sec", "45", "int", "Intervalle (s) de check des offres tier 'hot' (agressif)"),
+    ("retail_tier_normal_min", "5", "int", "Intervalle (min) de check des offres tier 'normal'"),
+    ("retail_tier_cold_min", "60", "int", "Intervalle (min) de check des offres tier 'cold'"),
+    ("retail_poll_interval_sec", "45", "int", "Période (s) du job de poll restock (tier pilote la cadence réelle)"),
+    ("retail_bucket_capacity", "12", "int", "Token bucket par enseigne : capacité (burst max de requêtes)"),
+    ("retail_bucket_refill_per_sec", "0.25", "decimal", "Token bucket : tokens rechargés/s (débit soutenu max/enseigne)"),
+    # Phase B — dispo en magasin (zone Agen). Plus lent que le hot online.
+    ("retail_store_stock_enabled", "false", "bool", "Active la veille dispo en magasin (sous retail_sourcing_enabled)"),
+    ("retail_store_check_interval_min", "60", "int", "Intervalle min (min) entre deux checks d'un (offre,magasin)"),
+    ("retail_store_request_cap_per_run", "30", "int", "Plafond de requêtes par run du job dispo magasin"),
+    # Phase C — achat ASSISTÉ (jamais de paiement auto ; l'humain finalise + 3DS).
+    ("assisted_buy_enabled", "false", "bool", "Kill-switch global de l'achat assisté (OFF par défaut)"),
+    ("assisted_buy_dry_run", "true", "bool", "Dry-run : simule le panier + alerte, sans carter réellement"),
     ("telegram_enabled", "false", "bool", "Active les notifications Telegram (token/chat_id dans .env)"),
     # Moat de données marché — multi-sources (défauts prudents : tout OFF, watched-only)
     ("marketdata_enabled", "false", "bool", "Master switch du moat de données marché"),
