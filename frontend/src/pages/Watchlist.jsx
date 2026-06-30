@@ -6,6 +6,7 @@ import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
 import { Card, Table, Badge, PageHeader, eur } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
+import TiltCard from "../components/TiltCard.jsx";
 
 function Sparkline({ latest }) {
   if (!latest) return <span className="text-slate-600">—</span>;
@@ -76,8 +77,10 @@ export default function Watchlist() {
   const cols = [
     { key: "name", label: "Produit", render: (r) => (
         <div className="flex items-center gap-2.5">
-          <ProductImage src={r.product?.image_url} alt={r.product?.name} seed={r.product?.set_slug}
-                        style={{ width: 32, height: 44 }} />
+          <TiltCard max={16} radius={6} className="flex-none" style={{ width: 32, height: 44 }}>
+            <ProductImage src={r.product?.image_url} alt={r.product?.name} seed={r.product?.set_slug}
+                          style={{ width: 32, height: 44 }} />
+          </TiltCard>
           <span className="font-medium">{r.product?.name}</span>
         </div>
       ) },

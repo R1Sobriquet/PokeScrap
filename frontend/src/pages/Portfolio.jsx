@@ -2,6 +2,7 @@ import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { eur } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
+import TiltCard from "../components/TiltCard.jsx";
 
 const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
@@ -74,7 +75,8 @@ export default function Portfolio() {
           {rows.map((r, i) => {
             const pnlUpR = (r.latent_pnl ?? 0) >= 0;
             return (
-              <div key={r.id ?? i} className="overflow-hidden rounded-2xl" style={{ ...panel, borderColor: "var(--border2)" }}>
+              <TiltCard key={r.id ?? i} max={8} radius={16} className="overflow-hidden rounded-2xl"
+                        style={{ ...panel, borderColor: "var(--border2)" }}>
                 <div className="relative">
                   <ProductImage src={r.image_url} alt={r.product_name} seed={r.product_id}
                                 rounded={0} showInitials={false} style={{ width: "100%", height: 120 }} />
@@ -96,7 +98,7 @@ export default function Portfolio() {
                 <div className="px-4 pb-3.5">
                   <StageBadges r={r} t={t} />
                 </div>
-              </div>
+              </TiltCard>
             );
           })}
         </div>

@@ -3,6 +3,7 @@ import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
 import { PageHeader, eur } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
+import TiltCard from "../components/TiltCard.jsx";
 
 const TONE_FILL = { buy: "#1E7A4D", fair: "#2E5FD6", pass: "#7A1220" };
 
@@ -108,7 +109,9 @@ export default function FlipRadar() {
               >
                 <div className="font-mono text-[12px] text-slate-500">{i + 1}</div>
                 <div className="flex min-w-0 items-center gap-2.5">
-                  <ProductImage src={o.image_url} alt={o.title || o.product_name} seed={o.retailer} style={{ width: 30, height: 42 }} />
+                  <TiltCard max={16} radius={6} className="flex-none" style={{ width: 30, height: 42 }}>
+                    <ProductImage src={o.image_url} alt={o.title || o.product_name} seed={o.retailer} style={{ width: 30, height: 42 }} />
+                  </TiltCard>
                   <div className="min-w-0">
                     <div className="truncate text-[13.5px] font-semibold">{o.title || o.product_name || o.url}</div>
                     <a href={o.url} target="_blank" rel="noreferrer" className="font-mono text-[10px]" style={{ color: "var(--blue-soft)" }}>
