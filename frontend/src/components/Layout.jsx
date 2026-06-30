@@ -6,6 +6,7 @@ import { useI18n, LANGS } from "../i18n.jsx";
 import { usePolling } from "../hooks/usePolling.js";
 import PackModal from "./PackModal.jsx";
 import Ticker from "./Ticker.jsx";
+import AlertToaster from "./AlertToaster.jsx";
 
 const SEV_DOT = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--green)" };
 
@@ -230,6 +231,7 @@ export default function Layout() {
   return (
     <div className="flex min-h-screen flex-col">
       <PackModal open={packOpen} onClose={() => setPackOpen(false)} />
+      <AlertToaster />
       {/* Header chrome PokéAlpha */}
       <header
         className="sticky top-0 z-50 flex h-[58px] items-center gap-3 px-5 backdrop-blur-xl"
