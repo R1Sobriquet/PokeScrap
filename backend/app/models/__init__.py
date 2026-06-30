@@ -8,6 +8,9 @@ from app.models.account_snapshot import AccountSnapshot
 from app.models.alert import Alert
 from app.models.buy_attempt import BuyAttempt
 from app.models.buy_rule import BuyRule
+from app.models.card_price_snapshot import CardPriceSnapshot
+from app.models.catalyst_event import CatalystEvent
+from app.models.daily_signal import DailySignal
 from app.models.grading_opportunity import GradingOpportunity
 from app.models.job_run import JobRun
 from app.models.data_quarantine import DataQuarantine
@@ -28,7 +31,9 @@ from app.models.retailer import Retailer
 from app.models.setting import Setting
 from app.models.sourcing_listing import SourcingListing
 from app.models.store_location import StoreLocation
+from app.models.tcgdex_card import TcgdexCard
 from app.models.tier import TierConfig
+from app.models.popularity_tier import PopularityTier
 from app.models.tracked_set import TrackedSet
 from app.models.transaction import Transaction
 from app.models.watchlist import Watchlist
@@ -38,6 +43,9 @@ __all__ = [
     "Alert",
     "BuyAttempt",
     "BuyRule",
+    "CardPriceSnapshot",
+    "CatalystEvent",
+    "DailySignal",
     "DataQuarantine",
     "GradingOpportunity",
     "JobRun",
@@ -47,6 +55,7 @@ __all__ = [
     "MatchReview",
     "MlModel",
     "OfferStoreAvailability",
+    "PopularityTier",
     "Position",
     "PriceSnapshot",
     "Product",
@@ -58,6 +67,7 @@ __all__ = [
     "Setting",
     "SourcingListing",
     "StoreLocation",
+    "TcgdexCard",
     "TierConfig",
     "TrackedSet",
     "Transaction",

@@ -30,6 +30,9 @@ class Product(Base):
     poketrace_id: Mapped[str | None] = mapped_column(String(64), unique=True, nullable=True)
     cardmarket_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
     tcgplayer_id: Mapped[str | None] = mapped_column(String(32), nullable=True)
+    #: Pont vers le registre canonique TCGdex (``tcgdex_card.card_id``) — nullable,
+    #: renseigné par le matcher Market Intelligence quand la correspondance est sûre.
+    tcgdex_id: Mapped[str | None] = mapped_column(String(40), nullable=True)
     image_url: Mapped[str | None] = mapped_column(String(512), nullable=True)
     is_active: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=1)
     created_at: Mapped[dt.datetime] = mapped_column(

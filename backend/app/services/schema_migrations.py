@@ -196,6 +196,99 @@ CREATE TABLE IF NOT EXISTS match_review (
 """
 
 
+# ---------------------------------------------------------------------------
+#  Market Intelligence (couche cartes sous-valorisées) — tables additives.
+#  Clé canonique = card_id (ID TCGdex). Argent en DECIMAL (convention repo 12,2).
+# ---------------------------------------------------------------------------
+
+_TCGDEX_CARD_DDL = """
+CREATE TABLE IF NOT EXISTS tcgdex_card (
+    card_id    VARCHAR(40)  NOT NULL,
+    set_id     VARCHAR(40)  NULL,
+    set_name   VARCHAR(255) NULL,
+    number     VARCHAR(32)  NULL,
+    rarity     VARCHAR(64)  NULL,
+    pokemon    VARCHAR(96)  NULL,
+    name_en    VARCHAR(255) NULL,
+    name_fr    VARCHAR(255) NULL,
+    name_jp    VARCHAR(255) NULL,
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (card_id),
+    KEY idx_tcgdex_set_number (set_id, number)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_CARD_PRICE_SNAPSHOT_DDL = """
+CREATE TABLE IF NOT EXISTS card_price_snapshot (
+    id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    card_id         VARCHAR(40) NOT NULL,
+    source          ENUM('cardmarket','ppt','tcgplayer','ebay_active') NOT NULL,
+    language        ENUM('EN','JP','FR') NOT NULL,
+    condition_grade VARCHAR(12) NOT NULL DEFAULT 'NM_RAW',
+    price_eur       DECIMAL(12,2) NOT NULL,
+    price_native    DECIMAL(12,2) NULL,
+    currency        CHAR(3)     NULL,
+    trend_eur       DECIMAL(12,2) NULL,
+    active_listings INT         NULL,
+    watchers        INT         NULL,
+    captured_at     DATE        NOT NULL,
+    created_at      DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_card_price_day (card_id, source, language, condition_grade, captured_at),
+    KEY idx_card_price_lookup (card_id, language, captured_at)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_POPULARITY_TIER_DDL = """
+CREATE TABLE IF NOT EXISTS popularity_tier (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    card_id    VARCHAR(40) NULL,
+    pokemon    VARCHAR(96) NULL,
+    tier       ENUM('S','A','B','C') NOT NULL,
+    created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_popularity_card (card_id),
+    UNIQUE KEY uq_popularity_pokemon (pokemon)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_CATALYST_EVENT_DDL = """
+CREATE TABLE IF NOT EXISTS catalyst_event (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    label      VARCHAR(255) NOT NULL,
+    event_date DATE         NOT NULL,
+    scope      VARCHAR(96)  NOT NULL DEFAULT 'global',
+    created_at DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    KEY idx_catalyst_date (event_date)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_DAILY_SIGNALS_DDL = """
+CREATE TABLE IF NOT EXISTS daily_signals (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    card_id      VARCHAR(40) NOT NULL,
+    language     ENUM('EN','JP','FR') NOT NULL,
+    price_eur    DECIMAL(12,2) NULL,
+    near_low     DECIMAL(6,4) NULL,
+    drawdown_sma DECIMAL(6,4) NULL,
+    bottoming    DECIMAL(6,4) NULL,
+    cross_lang   DECIMAL(6,4) NULL,
+    liquidity    DECIMAL(6,4) NULL,
+    momentum_7d  DECIMAL(7,4) NULL,
+    score        DECIMAL(8,4) NOT NULL DEFAULT 0,
+    budget_band  VARCHAR(8)  NULL,
+    buy_url      VARCHAR(512) NULL,
+    computed_at  DATE        NOT NULL,
+    created_at   DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_daily_signal_day (card_id, language, computed_at),
+    KEY idx_daily_signal_rank (computed_at, score)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+
 def _add_col(conn, db_name: str, table: str, column: str, ddl: str) -> None:
     """ALTER ADD COLUMN gardé par information_schema (idempotent)."""
     exists = conn.execute(text(
@@ -415,3 +508,15 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                  "ALTER TABLE retailers ADD COLUMN cart_add_url_template VARCHAR(512) NULL")
         _add_col(conn, db_name, "retailers", "cart_view_url",
                  "ALTER TABLE retailers ADD COLUMN cart_view_url VARCHAR(512) NULL")
+
+        # Market Intelligence — registre TCGdex, série prix carte, refs & signaux.
+        conn.execute(text(_TCGDEX_CARD_DDL))
+        conn.execute(text(_CARD_PRICE_SNAPSHOT_DDL))
+        conn.execute(text(_POPULARITY_TIER_DDL))
+        conn.execute(text(_CATALYST_EVENT_DDL))
+        conn.execute(text(_DAILY_SIGNALS_DDL))
+        # Pont registre existant ↔ TCGdex (nullable, rempli par le matcher).
+        _add_col(conn, db_name, "products", "tcgdex_id",
+                 "ALTER TABLE products ADD COLUMN tcgdex_id VARCHAR(40) NULL AFTER tcgplayer_id")
+        _add_index(conn, db_name, "products", "idx_products_tcgdex",
+                   "ALTER TABLE products ADD INDEX idx_products_tcgdex (tcgdex_id)")
