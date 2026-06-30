@@ -4,7 +4,7 @@ import { useAuth } from "../AuthContext.jsx";
 import { useTheme, THEMES } from "../ThemeContext.jsx";
 import { useI18n, LANGS } from "../i18n.jsx";
 import { usePolling } from "../hooks/usePolling.js";
-import PackModal from "./PackModal.jsx";
+import PackExperience from "./PackExperience.jsx";
 import Ticker from "./Ticker.jsx";
 import AlertToaster from "./AlertToaster.jsx";
 import CommandPalette from "./CommandPalette.jsx";
@@ -244,7 +244,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
-      <PackModal open={packOpen} onClose={() => setPackOpen(false)} />
+      <PackExperience open={packOpen} onClose={() => setPackOpen(false)} />
       <AlertToaster />
       <CommandPalette commands={commands} />
       {/* Header chrome PokéAlpha */}
