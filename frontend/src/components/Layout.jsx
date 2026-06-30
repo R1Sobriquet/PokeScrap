@@ -7,6 +7,8 @@ import { usePolling } from "../hooks/usePolling.js";
 import PackModal from "./PackModal.jsx";
 import Ticker from "./Ticker.jsx";
 import AlertToaster from "./AlertToaster.jsx";
+import CommandPalette from "./CommandPalette.jsx";
+import PwaControls from "./PwaControls.jsx";
 
 const SEV_DOT = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--green)" };
 
@@ -224,14 +226,27 @@ function LangSwitcher() {
 
 export default function Layout() {
   const { username, signOut } = useAuth();
-  const { t } = useI18n();
+  const { t, setLang } = useI18n();
+  const { setTheme } = useTheme();
   const navigate = useNavigate();
   const [packOpen, setPackOpen] = useState(false);
+
+  // Construit la liste de commandes ⌘K : navigation + actions.
+  const commands = [
+    ...NAV_GROUPS.flatMap((g) =>
+      g.items.map((n) => ({ id: `nav:${n.to}`, label: t(n.key), hint: t(g.section), run: () => navigate(n.to) }))
+    ),
+    { id: "act:pack", label: `✦ ${t("pack.cta")}`, hint: t("palette.action"), run: () => setPackOpen(true) },
+    ...THEMES.map((th) => ({ id: `theme:${th}`, label: `${t("chrome.theme")} · ${t(`theme.${th}`)}`, hint: t("chrome.theme"), run: () => setTheme(th) })),
+    ...LANGS.map((l) => ({ id: `lang:${l}`, label: `${t("chrome.lang")} · ${l.toUpperCase()}`, hint: t("chrome.lang"), run: () => setLang(l) })),
+    { id: "act:signout", label: t("chrome.signOut"), hint: t("palette.action"), run: () => { signOut(); navigate("/login"); } },
+  ];
 
   return (
     <div className="flex min-h-screen flex-col">
       <PackModal open={packOpen} onClose={() => setPackOpen(false)} />
       <AlertToaster />
+      <CommandPalette commands={commands} />
       {/* Header chrome PokéAlpha */}
       <header
         className="sticky top-0 z-50 flex h-[58px] items-center gap-3 px-5 backdrop-blur-xl"
@@ -242,6 +257,16 @@ export default function Layout() {
       >
         <Logo />
         <div className="flex-1" />
+        <button
+          onClick={() => window.dispatchEvent(new Event("pa:palette"))}
+          className="hidden items-center gap-2 rounded-xl px-3 py-2 text-[12px] md:flex"
+          style={{ border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--muted2)" }}
+          title={t("palette.placeholder")}
+        >
+          <span>🔍 {t("palette.search")}</span>
+          <kbd className="font-mono text-[10px] tracking-wide" style={{ color: "var(--muted)" }}>⌘K</kbd>
+        </button>
+        <PwaControls />
         <button
           onClick={() => setPackOpen(true)}
           className="hidden rounded-xl px-3 py-2 text-[13px] font-bold transition-shadow sm:block"

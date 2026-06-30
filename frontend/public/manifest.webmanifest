@@ -1,0 +1,13 @@
+{
+  "name": "PokéAlpha — Intelligence TCG",
+  "short_name": "PokéAlpha",
+  "description": "Intelligence TCG Pokémon par IA : flips, restocks et portefeuille en temps réel.",
+  "start_url": "/cockpit",
+  "scope": "/",
+  "display": "standalone",
+  "background_color": "#0A0D14",
+  "theme_color": "#0A0D14",
+  "icons": [
+    { "src": "/icon.svg", "sizes": "any", "type": "image/svg+xml", "purpose": "any maskable" }
+  ]
+}
