@@ -35,6 +35,7 @@ CHANNEL_ROUTING = {
     "restock": "restock",
     "new_sku": "restock",
     "health": "health",
+    "marketwatch": "marketwatch",
 }
 
 #: État stock → pastille pour les embeds restock.
@@ -237,6 +238,10 @@ def render_alert(alert) -> RenderedAlert:
         embed, buttons = _palier_embed(alert, payload)
     elif alert.alert_type in ("restock", "new_sku"):
         embed, buttons = _retail_embed(alert, payload)
+    elif alert.alert_type == "marketwatch":
+        # Digest « cartes à cibler » : embed groupé reconstruit depuis le payload.
+        from app.services.marketwatch_digest import digest_embed_from_payload
+        embed, buttons = digest_embed_from_payload(payload), ()
     else:  # tech_error, sell_reminder, reinvest… : embed sans bouton
         embed, buttons = _generic_embed(alert, payload)
     return RenderedAlert(channel_key=channel_for(alert.alert_type), embed=embed, buttons=buttons)

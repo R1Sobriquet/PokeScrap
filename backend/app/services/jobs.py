@@ -111,6 +111,30 @@ def _run_check_store_stock(db: Session) -> dict:
     return run_check_store_stock(db)
 
 
+def _run_marketwatch_sync_registry(db: Session) -> dict:
+    from app.marketwatch.registry import sync_registry
+
+    return sync_registry(db)
+
+
+def _run_marketwatch_ingest(db: Session) -> dict:
+    from app.services.marketwatch_ingest import run_ingest
+
+    return run_ingest(db)
+
+
+def _run_marketwatch_score(db: Session) -> dict:
+    from app.services.marketwatch_score import run_score
+
+    return run_score(db)
+
+
+def _run_marketwatch_digest(db: Session) -> dict:
+    from app.services.marketwatch_digest import run_digest
+
+    return run_digest(db, dry_run=False)
+
+
 JOBS = {
     "sync-tracked-sets": _run_sync_tracked_sets,
     "refresh-prices": _run_refresh_prices,
@@ -131,6 +155,11 @@ JOBS = {
     "source-health-check": _run_source_health_check,
     "flip-radar-scan": _run_flip_radar,
     "retail-check-store-stock": _run_check_store_stock,
+    # Market Intelligence — registre TCGdex, ingestion, signaux, digest hebdo.
+    "marketwatch-sync-registry": _run_marketwatch_sync_registry,
+    "marketwatch-ingest": _run_marketwatch_ingest,
+    "marketwatch-score": _run_marketwatch_score,
+    "marketwatch-digest": _run_marketwatch_digest,
 }
 
 

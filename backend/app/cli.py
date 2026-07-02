@@ -67,6 +67,35 @@ def cmd_refresh_prices(args: argparse.Namespace) -> None:
     _run_named_job("refresh-prices")
 
 
+def cmd_marketwatch(args: argparse.Namespace) -> None:
+    """Market Intelligence : enchaîne les étapes demandées (mêmes runners que le job)."""
+    from app.services.jobs import run_job_sync
+    from app.services.marketwatch_digest import run_digest
+
+    steps = []
+    if args.sync_registry:
+        steps.append("marketwatch-sync-registry")
+    if args.ingest:
+        steps.append("marketwatch-ingest")
+    if args.score:
+        steps.append("marketwatch-score")
+
+    with SessionLocal() as db:
+        for name in steps:
+            res = run_job_sync(db, name)
+            logger.info("%s: %s", name, res.get("summary", res))
+        if args.digest:
+            if args.dry_run:  # imprime sur stdout, ne poste rien, n'écrit rien
+                res = run_digest(db, dry_run=True)
+                print(res.get("text") or res.get("summary"))
+            else:
+                res = run_job_sync(db, "marketwatch-digest")
+                logger.info("marketwatch-digest: %s", res.get("summary", res))
+
+    if not (args.sync_registry or args.ingest or args.score or args.digest):
+        logger.info("marketwatch: rien à faire — préciser --ingest / --score / --digest.")
+
+
 def cmd_record_deposit(args: argparse.Namespace) -> None:
     with SessionLocal() as db:
         tx = record_deposit(db, args.amount)
@@ -289,6 +318,14 @@ def build_parser() -> argparse.ArgumentParser:
     p_mov = sub.add_parser("scan-movers", help="Affiche les top movers (hausse + volume)")
     p_mov.add_argument("--set", default=None, help="Filtrer sur un set_slug")
     p_mov.set_defaults(func=cmd_scan_movers)
+
+    p_mw = sub.add_parser("marketwatch", help="Market Intelligence : ingestion, signaux, digest")
+    p_mw.add_argument("--sync-registry", action="store_true", help="Synchronise le registre TCGdex")
+    p_mw.add_argument("--ingest", action="store_true", help="Ingestion des prix (sources activées)")
+    p_mw.add_argument("--score", action="store_true", help="Recalcule les signaux (daily_signals)")
+    p_mw.add_argument("--digest", action="store_true", help="Génère le digest « cartes à cibler »")
+    p_mw.add_argument("--dry-run", action="store_true", help="Imprime le digest sur stdout (aucun envoi Discord)")
+    p_mw.set_defaults(func=cmd_marketwatch)
 
     sub.add_parser("status", help="Agrégat d'observabilité (fraîcheur jobs/backup)").set_defaults(func=cmd_status)
     sub.add_parser("dead-mans-switch", help="Vérifie les jobs silencieux → tech_error").set_defaults(func=cmd_dead_mans_switch)

@@ -441,15 +441,16 @@ def ensure_schema_upgrades(engine: Engine) -> None:
             ),
             {"db": db_name},
         ).scalar()
-        if alert_type and ("'restock'" not in alert_type or "'health'" not in alert_type):
+        if alert_type and ("'restock'" not in alert_type or "'health'" not in alert_type
+                           or "'marketwatch'" not in alert_type):
             conn.execute(text(
                 "ALTER TABLE alerts MODIFY alert_type ENUM("
                 "'buy','sell_x2','sell_25_50_25','sell_forced','sell_reminder',"
                 "'cash_min','anti_pump','anti_fomo','illiquid','grading','reinvest',"
                 "'tax_provision','palier_up','palier_down','auction_reminder',"
-                "'lot_summary','tech_error','restock','new_sku','health') NOT NULL"
+                "'lot_summary','tech_error','restock','new_sku','health','marketwatch') NOT NULL"
             ))
-            logger.info("Migration : valeurs ENUM alerts.alert_type restock/new_sku/health.")
+            logger.info("Migration : valeurs ENUM alerts.alert_type restock/new_sku/health/marketwatch.")
 
         # PokéAlpha — image produit sur les offres retail (JSON-LD/og:image).
         img_col = conn.execute(

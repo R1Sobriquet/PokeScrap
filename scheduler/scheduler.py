@@ -179,6 +179,36 @@ def match_products() -> None:
     logger.info("match_products: %s", result.get("summary"))
 
 
+def marketwatch_ingest_and_score() -> None:
+    # Ingestion des prix carte-centric puis recalcul des signaux (1×/jour).
+    from app.services.marketwatch_ingest import run_ingest
+    from app.services.marketwatch_score import run_score
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        ing = run_ingest(db)
+        sc = run_score(db)
+    logger.info("marketwatch ingest/score: %s | %s", ing.get("summary"), sc.get("summary"))
+
+
+def marketwatch_sync_registry() -> None:
+    from app.marketwatch.registry import sync_registry
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = sync_registry(db)
+    logger.info("marketwatch_sync_registry: %s", result.get("summary"))
+
+
+def marketwatch_digest() -> None:
+    from app.services.marketwatch_digest import run_digest
+
+    with SessionLocal() as db:
+        ensure_runtime_settings(db)
+        result = run_digest(db, dry_run=False)
+    logger.info("marketwatch_digest: %s", result.get("summary"))
+
+
 def source_health_check() -> None:
     from app.services.source_health import check_sources
 
@@ -265,6 +295,17 @@ def main() -> None:
     scheduler.add_job(match_products, CronTrigger(hour=5, minute=20, timezone=TIMEZONE), id="match_products")
     scheduler.add_job(source_health_check, "interval", hours=2, id="source_health_check")
     scheduler.add_job(flip_radar_scan, "interval", hours=3, id="flip_radar_scan")
+    # Market Intelligence : registre hebdo (dim. 02:40), ingestion+signaux 1×/jour
+    # (03:00, après le moat 02:00), digest « cartes à cibler » hebdo (lun. 08:00).
+    scheduler.add_job(marketwatch_sync_registry,
+                      CronTrigger(day_of_week="sun", hour=2, minute=40, timezone=TIMEZONE),
+                      id="marketwatch_sync_registry")
+    scheduler.add_job(marketwatch_ingest_and_score,
+                      CronTrigger(hour=3, minute=0, timezone=TIMEZONE),
+                      id="marketwatch_ingest_and_score")
+    scheduler.add_job(marketwatch_digest,
+                      CronTrigger(day_of_week="mon", hour=8, minute=0, timezone=TIMEZONE),
+                      id="marketwatch_digest")
     logger.info(
         "Scheduler démarré (tz=%s, prices='%s', history='%s', kpi='%s', grading=weekly, deadman=30m).",
         TIMEZONE,

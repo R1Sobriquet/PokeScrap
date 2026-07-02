@@ -271,6 +271,64 @@ requêtes :
 `sanity_bounds_eur`, `alert_digest_enabled`, `source_health_*`. Rollback :
 `db/migrations/down_marketdata_moat.sql`.
 
+## Market Intelligence — cartes sous-valorisées
+
+Couche de **monitoring / aide à la décision UNIQUEMENT** : elle ingère des prix,
+en construit un historique propre, en dérive des signaux de sous-valorisation et
+pousse un digest « cartes à cibler » sur Discord. **Aucun achat automatique** — la
+sortie est une short-list classée, à vérifier à la main.
+
+**Clé de jointure canonique = `card_id` TCGdex** (résout le « slug mismatch » :
+toute source s'y rattache via un matcher). Le registre `tcgdex_card` (noms
+EN/FR/JP) est peuplé depuis TCGdex ; `products.tcgdex_id` fait le pont avec le
+registre existant.
+
+**Tables** (additives) : `card_price_snapshot` (série par
+`(card_id, source, language, condition_grade, captured_at)` → upsert idempotent,
+`DECIMAL`), `daily_signals` (signaux + score), `popularity_tier` &
+`catalyst_event` (signaux « soft » **éditables à la main**). Rollback :
+`db/migrations/down_marketwatch.sql`.
+
+**Sources** (port `CardPriceSource.fetch()`, `app/marketwatch/sources/`) :
+- **Cardmarket = FICHIERS publics quotidiens** (price-guide low/avg/trend +
+  catalogue `idProduct` ↔ carte). L'API est fermée et le scraping bloqué
+  (DataDome) → on ne tente ni l'un ni l'autre. Un **matcher testable**
+  (`idProduct` → `card_id` sur numéro + noms multilingues) rapproche les produits ;
+  les non-matchés sont journalisés. URLs/chemins via env (`MARKETWATCH_CARDMARKET_*`).
+- **PokemonPriceTracker** (US TCGplayer + EU Cardmarket, USD→EUR via `fx_usd_eur`).
+- **eBay Browse** — annonces **actives** (prix demandés, agrégats) + `watchers`
+  (`getItem`). Les **ventes** sont verrouillées côté API → non tentées.
+- **JP** — stub best-effort clairement marqué TODO (ne bloque pas le pipeline).
+
+**Score** (`app/domain/marketwatch_signals.py`, fonctions pures) :
+```
+score = ( 0.35·near_low + 0.20·drawdown_sma + 0.20·bottoming
+        + 0.15·cross_lang + 0.10·liquidity )
+        × tier_multiplier(popularity) × catalyst_bonus(catalyseur < 90 j)
+```
+⚠️ **Le score CLASSE des candidats à VÉRIFIER — il NE PRÉDIT PAS un prix** et ne
+déclenche aucun achat. Sous un **plancher de liquidité**, un candidat est exclu
+même « pas cher ». Sortie filtrée par tranche budget (<10 € / 10–20 € / ≤50 €) et
+priorité de langue **EN > JP > FR**.
+
+**Jobs** (panel + scheduler, `job_runs`) : `marketwatch-sync-registry` (hebdo),
+`marketwatch-ingest` + `marketwatch-score` (1×/jour, après le moat), et
+`marketwatch-digest` (**hebdo**, anti-bruit → canal `DISCORD_CHANNEL_MARKETWATCH`,
+repli `#systeme`).
+
+**CLI** (mêmes runners que les jobs) :
+```bash
+docker compose exec backend python -m app.cli marketwatch --sync-registry
+docker compose exec backend python -m app.cli marketwatch --ingest --score
+docker compose exec backend python -m app.cli marketwatch --digest            # poste sur Discord
+docker compose exec backend python -m app.cli marketwatch --digest --dry-run  # imprime sur stdout
+```
+
+**Réglages** (table `settings`) : `marketwatch_enabled`,
+`marketwatch_cardmarket_enabled`, `marketwatch_ppt_enabled`,
+`marketwatch_ebay_enabled`, `marketwatch_min_liquidity`,
+`marketwatch_buy_url_template`, `fx_usd_eur`. Tout est **OFF par défaut**.
+
 ## Sourcing & auto-watchlist
 
 - **Scraping auto désactivé par défaut** (`sourcing_scraping_enabled=false`) :

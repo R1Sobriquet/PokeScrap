@@ -46,6 +46,8 @@ CHANNELS = {
     "systeme": os.getenv("DISCORD_CHANNEL_SYSTEME", ""),
     "restock": os.getenv("DISCORD_CHANNEL_RESTOCK", ""),  # PokéStock FR
     "health": os.getenv("DISCORD_CHANNEL_HEALTH", ""),    # moniteur sources marché
+    # Digest « cartes à cibler » (Market Intelligence). Repli sur #systeme si non configuré.
+    "marketwatch": os.getenv("DISCORD_CHANNEL_MARKETWATCH", "") or os.getenv("DISCORD_CHANNEL_SYSTEME", ""),
 }
 TELEGRAM_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_CHAT_ID = os.getenv("TELEGRAM_CHAT_ID", "")
