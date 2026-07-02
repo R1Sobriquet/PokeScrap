@@ -21,7 +21,8 @@ export default function Ticker() {
   const loop = [...items, ...items];
 
   return (
-    <div className="overflow-hidden border-b" style={{ borderColor: "var(--line)", background: "var(--ticker-bg)" }}>
+    <div data-tour="ticker" className="overflow-hidden border-b" aria-hidden="true"
+         style={{ borderColor: "var(--line)", background: "var(--ticker-bg)" }}>
       <div className="flex gap-10 py-2 font-mono text-[11px] whitespace-nowrap" style={{ width: "max-content", animation: "pa-ticker 38s linear infinite" }}>
         {loop.map((it, i) => (
           <span key={`${it.k}-${i}`} style={{ color: "var(--muted2)" }}>

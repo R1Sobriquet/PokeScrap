@@ -9,6 +9,7 @@ import Ticker from "./Ticker.jsx";
 import AlertToaster from "./AlertToaster.jsx";
 import CommandPalette from "./CommandPalette.jsx";
 import PwaControls from "./PwaControls.jsx";
+import { startTour } from "../onboarding/tour.js";
 
 const SEV_DOT = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--green)" };
 
@@ -20,9 +21,12 @@ function AlertsMenu() {
   return (
     <div className="relative flex-none">
       <button
+        data-tour="alerts"
         onClick={() => setOpen((v) => !v)}
         className="flex items-center gap-1.5 rounded-xl px-2.5 py-2"
         style={{ border: "1px solid rgba(244,88,95,.3)", background: "rgba(244,88,95,.08)" }}
+        aria-haspopup="menu"
+        aria-expanded={open}
       >
         <span style={{ width: 6, height: 6, borderRadius: "50%", background: "var(--red)", animation: "pa-pulse 2s infinite" }} />
         <span className="font-mono text-[11px]" style={{ color: "var(--red-text)" }}>
@@ -173,9 +177,12 @@ function ThemeSwitcher() {
   const { t } = useI18n();
   return (
     <div
+      data-tour="theme"
       className="flex items-center gap-1.5 rounded-full border p-1"
       style={{ borderColor: "var(--border2)", background: "var(--panel2)" }}
       title={t("chrome.theme")}
+      role="group"
+      aria-label={t("chrome.theme")}
     >
       {THEMES.map((th) => (
         <button
@@ -231,12 +238,19 @@ export default function Layout() {
   const navigate = useNavigate();
   const [packOpen, setPackOpen] = useState(false);
 
+  // Relance la visite guidée depuis le Cockpit (les ancres y vivent).
+  const replayTour = () => {
+    navigate("/cockpit");
+    setTimeout(() => startTour(t), 500);
+  };
+
   // Construit la liste de commandes ⌘K : navigation + actions.
   const commands = [
     ...NAV_GROUPS.flatMap((g) =>
       g.items.map((n) => ({ id: `nav:${n.to}`, label: t(n.key), hint: t(g.section), run: () => navigate(n.to) }))
     ),
     { id: "act:pack", label: `✦ ${t("pack.cta")}`, hint: t("palette.action"), run: () => setPackOpen(true) },
+    { id: "act:tour", label: `🎓 ${t("tour.replay")}`, hint: t("palette.action"), run: replayTour },
     ...THEMES.map((th) => ({ id: `theme:${th}`, label: `${t("chrome.theme")} · ${t(`theme.${th}`)}`, hint: t("chrome.theme"), run: () => setTheme(th) })),
     ...LANGS.map((l) => ({ id: `lang:${l}`, label: `${t("chrome.lang")} · ${l.toUpperCase()}`, hint: t("chrome.lang"), run: () => setLang(l) })),
     { id: "act:signout", label: t("chrome.signOut"), hint: t("palette.action"), run: () => { signOut(); navigate("/login"); } },
@@ -258,16 +272,28 @@ export default function Layout() {
         <Logo />
         <div className="flex-1" />
         <button
+          data-tour="palette"
           onClick={() => window.dispatchEvent(new Event("pa:palette"))}
           className="hidden items-center gap-2 rounded-xl px-3 py-2 text-[12px] md:flex"
           style={{ border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--muted2)" }}
           title={t("palette.placeholder")}
+          aria-label={t("palette.placeholder")}
         >
           <span>🔍 {t("palette.search")}</span>
           <kbd className="font-mono text-[10px] tracking-wide" style={{ color: "var(--muted)" }}>⌘K</kbd>
         </button>
         <PwaControls />
         <button
+          onClick={replayTour}
+          className="hidden h-9 w-9 rounded-xl text-[14px] font-bold sm:block"
+          style={{ border: "1px solid var(--border2)", background: "var(--panel2)", color: "var(--muted2)" }}
+          title={t("tour.replay")}
+          aria-label={t("tour.replay")}
+        >
+          ?
+        </button>
+        <button
+          data-tour="pack"
           onClick={() => setPackOpen(true)}
           className="hidden rounded-xl px-3 py-2 text-[13px] font-bold transition-shadow sm:block"
           style={{ border: "1px solid rgba(155,123,255,.45)", background: "rgba(155,123,255,.1)", color: "var(--violet-text)" }}
@@ -283,10 +309,11 @@ export default function Layout() {
       <div className="flex flex-1">
         {/* Sidebar réskinée */}
         <aside
+          data-tour="sidebar"
           className="w-56 shrink-0 p-3"
           style={{ borderRight: "1px solid var(--line)", background: "var(--panel)" }}
         >
-          <nav className="flex flex-col gap-4">
+          <nav className="flex flex-col gap-4" aria-label={t("nav.section.market")}>
             {NAV_GROUPS.map((group) => (
               <div key={group.section} className="flex flex-col gap-1">
                 <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">

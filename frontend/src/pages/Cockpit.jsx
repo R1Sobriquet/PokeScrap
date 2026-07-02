@@ -6,6 +6,8 @@ import { eur, pct } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 import HoloCard from "../components/HoloCard.jsx";
 import { CountUp, Confetti } from "../components/motion.jsx";
+import { useAutoTour } from "../onboarding/useAutoTour.js";
+import { CockpitSkeleton } from "../components/Skeleton.jsx";
 
 const money = (v) => `${(Number(v) || 0).toFixed(2)} €`;
 
@@ -78,7 +80,9 @@ export default function Cockpit() {
   const { data: opps } = usePolling("/retail/opportunities", { intervalSec: 90 });
   const { t } = useI18n();
   const navigate = useNavigate();
-  if (loading || !data) return <p className="text-slate-400">{t("common.loading")}</p>;
+  // Onboarding : lancé une seule fois, quand les ancres du Cockpit existent.
+  useAutoTour(t, !loading && Boolean(data));
+  if (loading || !data) return <CockpitSkeleton />;
   const k = data.kpis;
   const tier = data.tier;
   const a = data.allocation;
@@ -104,7 +108,7 @@ export default function Cockpit() {
       </div>
 
       {/* Deal of the Day — carte holo 3D interactive */}
-      <div className="overflow-hidden rounded-2xl" style={{ ...panel, background: "var(--ai-bg)", border: "1px solid var(--ai-border)" }}>
+      <div data-tour="deal" className="overflow-hidden rounded-2xl" style={{ ...panel, background: "var(--ai-bg)", border: "1px solid var(--ai-border)" }}>
         <div className="grid items-center gap-2 md:grid-cols-[360px_1fr]">
           <div className="relative cursor-grab active:cursor-grabbing">
             <Confetti fire={deal?.verdict === "STRONG BUY"} />
@@ -153,7 +157,7 @@ export default function Cockpit() {
       </div>
 
       {/* Vue d'ensemble — jauges */}
-      <div>
+      <div data-tour="kpis">
         <div className="font-mono text-[11px] uppercase tracking-[0.16em] text-slate-500">
           {t("cockpit.section.overview")}
         </div>

@@ -177,3 +177,71 @@ body {
 @keyframes pa-cardup { from { transform: translateY(150px) scale(.4) rotate(9deg); opacity: 0; } }
 @keyframes pa-confetti { from { opacity: 1; } to { transform: translateY(280px) rotate(560deg); opacity: 0; } }
 .pa-pagein { animation: pa-pagein .4s ease both; }
+
+/* ---------------------------------------------------------------------------
+   Accessibilité — anneau focus visible partout, lien d'évitement, motion.
+   --------------------------------------------------------------------------- */
+:focus-visible {
+  outline: 2px solid var(--blue);
+  outline-offset: 2px;
+  border-radius: 6px;
+}
+.pa-skip-link {
+  position: absolute; left: -9999px; top: 0; z-index: 999;
+  padding: 10px 16px; border-radius: 0 0 10px 0;
+  background: var(--blue); color: #fff; font-weight: 700; font-size: 13px;
+}
+.pa-skip-link:focus { left: 0; }
+
+/* Squelettes de chargement (shimmer). */
+.pa-skeleton {
+  background: linear-gradient(100deg, var(--panel2) 40%, var(--border) 50%, var(--panel2) 60%);
+  background-size: 200% 100%;
+  animation: pa-shimmer 1.4s ease-in-out infinite;
+}
+@keyframes pa-shimmer { 0% { background-position: 120% 0; } 100% { background-position: -80% 0; } }
+
+/* Motion réduit : on fige les animations décoratives (ticker, holo, flottements,
+   shimmer) — les transitions d'état restent. */
+@media (prefers-reduced-motion: reduce) {
+  *[style*="pa-ticker"], .pa-skeleton { animation: none !important; }
+  .pa-pagein { animation-duration: 0.01s; }
+  *, ::before, ::after { animation-duration: 0.6s; }
+}
+
+/* ---------------------------------------------------------------------------
+   Visite guidée (driver.js) — popover au thème PokéAlpha.
+   --------------------------------------------------------------------------- */
+.driver-popover.pa-tour {
+  background: var(--panel-solid);
+  color: var(--text);
+  border: 1px solid var(--border2);
+  border-radius: 14px;
+  box-shadow: 0 24px 60px var(--shadow);
+  font-family: "Outfit", ui-sans-serif, system-ui, sans-serif;
+  max-width: 340px;
+}
+.driver-popover.pa-tour .driver-popover-title {
+  font-size: 15px; font-weight: 800; letter-spacing: -0.01em;
+}
+.driver-popover.pa-tour .driver-popover-description {
+  color: var(--muted2); font-size: 13px; line-height: 1.55;
+}
+.driver-popover.pa-tour .driver-popover-progress-text {
+  color: var(--muted); font-family: "JetBrains Mono", monospace; font-size: 10px;
+}
+.driver-popover.pa-tour button {
+  border-radius: 9px; padding: 6px 12px; font-weight: 700; font-size: 12.5px;
+  background: var(--panel2); color: var(--text2); border: 1px solid var(--border2);
+  text-shadow: none;
+}
+.driver-popover.pa-tour .driver-popover-next-btn {
+  background: linear-gradient(180deg, #FFD75A, #FFC91F); color: #10131A; border: none;
+}
+.driver-popover.pa-tour .driver-popover-close-btn {
+  background: transparent; border: none; color: var(--muted);
+}
+.driver-popover.pa-tour .driver-popover-arrow-side-top { border-top-color: var(--panel-solid); }
+.driver-popover.pa-tour .driver-popover-arrow-side-bottom { border-bottom-color: var(--panel-solid); }
+.driver-popover.pa-tour .driver-popover-arrow-side-left { border-left-color: var(--panel-solid); }
+.driver-popover.pa-tour .driver-popover-arrow-side-right { border-right-color: var(--panel-solid); }
