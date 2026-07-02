@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { usePolling } from "../hooks/usePolling.js";
+import { useI18n } from "../i18n.jsx";
 
 const SEV = {
   critical: { bar: "var(--red)", text: "var(--red-text)" },
@@ -16,8 +17,10 @@ const routeFor = (type = "") =>
 export default function AlertToaster() {
   const { data } = usePolling("/alerts?status=pending", { intervalSec: 30 });
   const navigate = useNavigate();
+  const { t } = useI18n();
   const seen = useRef(null); // null = pas encore initialisé
   const [toasts, setToasts] = useState([]);
+  const [paused, setPaused] = useState(false); // survol/focus → pas d'auto-dismiss
 
   useEffect(() => {
     if (!Array.isArray(data)) return;
@@ -33,15 +36,23 @@ export default function AlertToaster() {
 
   const dismiss = (k) => setToasts((cur) => cur.filter((t) => t._k !== k));
 
-  // Auto-dismiss : chaque toast disparaît après ~6,5 s.
+  // Auto-dismiss (~6,5 s), suspendu tant que le pointeur ou le focus est dessus
+  // (WCAG 2.2.1 : l'utilisateur garde le contrôle du temps de lecture).
   useEffect(() => {
-    if (toasts.length === 0) return;
-    const timers = toasts.map((t) => setTimeout(() => dismiss(t._k), 6500));
+    if (toasts.length === 0 || paused) return;
+    const timers = toasts.map((t2) => setTimeout(() => dismiss(t2._k), 6500));
     return () => timers.forEach(clearTimeout);
-  }, [toasts]);
+  }, [toasts, paused]);
 
   return (
-    <div style={{ position: "fixed", right: 18, bottom: 18, zIndex: 400, display: "flex", flexDirection: "column", gap: 10, pointerEvents: "none" }}>
+    <div
+      role="status"
+      aria-live="polite"
+      onMouseEnter={() => setPaused(true)}
+      onMouseLeave={() => setPaused(false)}
+      onFocusCapture={() => setPaused(true)}
+      onBlurCapture={() => setPaused(false)}
+      style={{ position: "fixed", right: 18, bottom: 18, zIndex: 400, display: "flex", flexDirection: "column", gap: 10, pointerEvents: "none" }}>
       <AnimatePresence>
         {toasts.map((a) => {
           const sev = SEV[a.severity] || SEV.info;
@@ -53,6 +64,12 @@ export default function AlertToaster() {
               exit={{ opacity: 0, x: 80, scale: 0.9 }}
               transition={{ type: "spring", stiffness: 320, damping: 26 }}
               onClick={() => { navigate(routeFor(a.alert_type)); dismiss(a._k); }}
+              onKeyDown={(e) => {
+                if (e.key === "Enter" || e.key === " ") { e.preventDefault(); navigate(routeFor(a.alert_type)); dismiss(a._k); }
+              }}
+              role="button"
+              tabIndex={0}
+              aria-label={`${a.alert_type || "alert"} — ${a.title}`}
               style={{
                 pointerEvents: "auto", cursor: "pointer", position: "relative", width: 312, overflow: "hidden",
                 borderRadius: 14, padding: "12px 14px 12px 18px", background: "var(--panel-solid)",
@@ -68,6 +85,7 @@ export default function AlertToaster() {
                   {a.alert_type || "alert"}
                 </span>
                 <button onClick={(e) => { e.stopPropagation(); dismiss(a._k); }}
+                        aria-label={t("common.dismiss")}
                         className="font-mono text-[12px] leading-none text-slate-500 hover:text-slate-300">✕</button>
               </div>
               <div className="mt-1 text-[13.5px] font-semibold leading-snug" style={{ color: "var(--text)" }}>{a.title}</div>

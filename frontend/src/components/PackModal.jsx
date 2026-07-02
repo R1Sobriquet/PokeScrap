@@ -64,7 +64,7 @@ export default function PackModal({ open, onClose }) {
   };
 
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(6,4,16,.85)", backdropFilter: "blur(16px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
+    <div role="dialog" aria-modal="true" style={{ position: "fixed", inset: 0, zIndex: 450, background: "rgba(6,4,16,.85)", backdropFilter: "blur(16px)", display: "flex", alignItems: "center", justifyContent: "center" }}>
       <button onClick={close} style={{ position: "absolute", top: 24, right: 28, width: 38, height: 38, borderRadius: 12, border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.07)", color: "#F2F5FB", fontSize: 16, cursor: "pointer" }}>✕</button>
 
       {!ripped ? (

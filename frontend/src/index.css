@@ -16,7 +16,7 @@
   --panel: #11151E; --panel-solid: #11151E; --panel2: #12161F;
   --border: #1F2533; --border2: #232A3B; --border-hover: #2C3650;
   --line: #1C2231; --bar: #1D2434;
-  --text: #E9EDF5; --text2: #DCE1ED; --muted: #8B94A8; --muted2: #A7B0C3; --faint: #5A6275;
+  --text: #E9EDF5; --text2: #DCE1ED; --muted: #8B94A8; --muted2: #A7B0C3; --faint: #808AA0;
   --header-bg: rgba(13,16,25,.85);
   --tab-active-bg: #161C2A; --tab-active-border: #232B3D;
   --shadow: rgba(0,0,0,.5);
@@ -38,7 +38,7 @@
   --c-bg: 10 13 20; --c-panel: 17 21 30; --c-panel2: 18 22 31;
   --c-border: 31 37 51; --c-border2: 35 42 59; --c-border-hover: 44 54 80;
   --c-text: 233 237 245; --c-text2: 220 225 237;
-  --c-muted: 139 148 168; --c-muted2: 167 176 195; --c-faint: 90 98 117;
+  --c-muted: 139 148 168; --c-muted2: 167 176 195; --c-faint: 128 138 160;
   --c-blue: 61 123 255; --c-green: 52 211 153; --c-yellow: 255 203 46;
   --c-red: 244 88 95; --c-violet: 155 123 255;
 }
@@ -47,7 +47,7 @@
   --panel: #FFFFFF; --panel-solid: #FFFFFF; --panel2: #EEF1F7;
   --border: #E4E8F0; --border2: #D9DEE9; --border-hover: #B9C2D4;
   --line: #ECEFF5; --bar: #E6EAF2;
-  --text: #161B26; --text2: #2A3140; --muted: #5C6678; --muted2: #49536A; --faint: #9AA3B5;
+  --text: #161B26; --text2: #2A3140; --muted: #5C6678; --muted2: #49536A; --faint: #5F697D;
   --header-bg: rgba(255,255,255,.85);
   --tab-active-bg: #E9EEF7; --tab-active-border: #D2D9E6;
   --shadow: rgba(23,27,38,.14);
@@ -68,8 +68,8 @@
   --c-bg: 244 246 250; --c-panel: 255 255 255; --c-panel2: 238 241 247;
   --c-border: 228 232 240; --c-border2: 217 222 233; --c-border-hover: 185 194 212;
   --c-text: 22 27 38; --c-text2: 42 49 64;
-  --c-muted: 92 102 120; --c-muted2: 73 83 106; --c-faint: 154 163 181;
-  --c-blue: 37 99 235; --c-green: 12 155 108; --c-yellow: 224 164 0;
+  --c-muted: 92 102 120; --c-muted2: 73 83 106; --c-faint: 95 105 125;
+  --c-blue: 37 99 235; --c-green: 9 123 85; --c-yellow: 151 106 0;
   --c-red: 215 55 63; --c-violet: 124 58 237;
 }
 [data-pa-theme="holo"] {
@@ -87,7 +87,7 @@
   --panel: linear-gradient(135deg, rgba(168,130,255,.10), rgba(255,255,255,.045) 40%, rgba(80,200,255,.08)); --panel-solid: #171030; --panel2: rgba(255,255,255,.08);
   --border: rgba(255,255,255,.13); --border2: rgba(255,255,255,.17); --border-hover: rgba(255,255,255,.32);
   --line: rgba(255,255,255,.11); --bar: rgba(255,255,255,.13);
-  --text: #F1EEFB; --text2: #E6E1F4; --muted: #A9A3C8; --muted2: #BDB7D6; --faint: #6F6996;
+  --text: #F1EEFB; --text2: #E6E1F4; --muted: #A9A3C8; --muted2: #BDB7D6; --faint: #8F89B5;
   --header-bg: rgba(16,11,38,.72);
   --tab-active-bg: rgba(255,255,255,.12); --tab-active-border: rgba(255,255,255,.22);
   --shadow: rgba(5,2,20,.6);
@@ -108,7 +108,7 @@
   --c-bg: 12 8 28; --c-panel: 23 16 48; --c-panel2: 38 32 60;
   --c-border: 42 36 64; --c-border2: 50 44 72; --c-border-hover: 70 62 96;
   --c-text: 241 238 251; --c-text2: 230 225 244;
-  --c-muted: 169 163 200; --c-muted2: 189 183 214; --c-faint: 111 105 150;
+  --c-muted: 169 163 200; --c-muted2: 189 183 214; --c-faint: 143 137 181;
   --c-blue: 91 140 255; --c-green: 52 226 164; --c-yellow: 255 203 46;
   --c-red: 255 107 114; --c-violet: 184 156 255;
 }
@@ -123,7 +123,7 @@
   --panel: #1C120D; --panel-solid: #1C120D; --panel2: #221610;
   --border: #36241B; --border2: #3E2A1F; --border-hover: #5E3D2A;
   --line: #2C1D15; --bar: #2E1F16;
-  --text: #FBEFE7; --text2: #F0E2D7; --muted: #B59686; --muted2: #CBAE9E; --faint: #7A5F50;
+  --text: #FBEFE7; --text2: #F0E2D7; --muted: #B59686; --muted2: #CBAE9E; --faint: #A08370;
   --header-bg: rgba(18,11,8,.86);
   --tab-active-bg: #271913; --tab-active-border: #43301F;
   --shadow: rgba(20,6,0,.6);
@@ -144,7 +144,7 @@
   --c-bg: 18 11 8; --c-panel: 28 18 13; --c-panel2: 34 22 16;
   --c-border: 54 36 27; --c-border2: 62 42 31; --c-border-hover: 94 61 42;
   --c-text: 251 239 231; --c-text2: 240 226 215;
-  --c-muted: 181 150 134; --c-muted2: 203 174 158; --c-faint: 122 95 80;
+  --c-muted: 181 150 134; --c-muted2: 203 174 158; --c-faint: 160 131 112;
   --c-blue: 91 168 255; --c-green: 79 217 160; --c-yellow: 255 178 62;
   --c-red: 255 94 84; --c-violet: 201 139 255;
 }
@@ -201,13 +201,20 @@ body {
 }
 @keyframes pa-shimmer { 0% { background-position: 120% 0; } 100% { background-position: -80% 0; } }
 
-/* Motion réduit : on fige les animations décoratives (ticker, holo, flottements,
-   shimmer) — les transitions d'état restent. */
+/* Motion réduit (WCAG 2.3.3) : toutes les animations décoratives (ticker, holo,
+   pulse, floaty, shimmer, confetti…) sont figées ; framer-motion suit via
+   <MotionConfig reducedMotion="user"> dans App.jsx. */
 @media (prefers-reduced-motion: reduce) {
-  *[style*="pa-ticker"], .pa-skeleton { animation: none !important; }
-  .pa-pagein { animation-duration: 0.01s; }
-  *, ::before, ::after { animation-duration: 0.6s; }
+  *, *::before, *::after {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.01ms !important;
+    scroll-behavior: auto !important;
+  }
 }
+
+/* Marquee : pause au survol (WCAG 2.2.2 — contenu en mouvement contrôlable). */
+[data-tour="ticker"]:hover > div { animation-play-state: paused; }
 
 /* ---------------------------------------------------------------------------
    Visite guidée (driver.js) — popover au thème PokéAlpha.

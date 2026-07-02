@@ -68,6 +68,9 @@ export default function CommandPalette({ commands }) {
             initial={{ y: -18, scale: 0.97, opacity: 0 }} animate={{ y: 0, scale: 1, opacity: 1 }} exit={{ y: -10, opacity: 0 }}
             transition={{ type: "spring", stiffness: 360, damping: 28 }}
             onClick={(e) => e.stopPropagation()}
+            role="dialog"
+            aria-modal="true"
+            aria-label={t("palette.placeholder")}
             style={{ width: "min(620px, 92vw)", overflow: "hidden", borderRadius: 16,
               background: "var(--panel-solid)", border: "1px solid var(--border2)", boxShadow: "0 40px 100px var(--shadow)" }}
           >

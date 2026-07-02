@@ -30,6 +30,7 @@ import Restock from "../pages/Restock.jsx";
 import Retailers from "../pages/Retailers.jsx";
 import Calendar from "../pages/Calendar.jsx";
 import SetExplorer from "../pages/SetExplorer.jsx";
+import Layout from "../components/Layout.jsx";
 import App from "../App.jsx";
 
 const wrap = (ui) => render(<MemoryRouter><AuthProvider>{ui}</AuthProvider></MemoryRouter>);
@@ -70,6 +71,17 @@ describe("Settings — bascule Pro", () => {
     await waitFor(() => expect(h.post).toHaveBeenCalled());
     expect(h.post.mock.calls[0][1]).toBe("/settings/switch-pro");
     expect(h.post.mock.calls[0][2]).toEqual({ to_pro: true });
+  });
+});
+
+describe("Layout — shell", () => {
+  it("rend skip-link, nav scindée (PokéStock FR) et bouton tutoriel", () => {
+    h.polled["/alerts?status=pending"] = [];
+    wrap(<Layout />);
+    expect(screen.getByText("Aller au contenu")).toBeInTheDocument();
+    expect(screen.getByText("PokéStock FR")).toBeInTheDocument(); // groupe scindé
+    expect(screen.getByLabelText("Rejouer le tutoriel")).toBeInTheDocument();
+    expect(screen.getByLabelText("Ouvrir la navigation")).toBeInTheDocument(); // hamburger mobile
   });
 });
 

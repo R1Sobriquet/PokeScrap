@@ -1,15 +1,17 @@
-import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Suspense, useState } from "react";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { useAuth } from "../AuthContext.jsx";
 import { useTheme, THEMES } from "../ThemeContext.jsx";
 import { useI18n, LANGS } from "../i18n.jsx";
-import { usePolling } from "../hooks/usePolling.js";
+import { usePolling, invalidatePollingCache } from "../hooks/usePolling.js";
 import PackExperience from "./PackExperience.jsx";
 import Ticker from "./Ticker.jsx";
 import AlertToaster from "./AlertToaster.jsx";
 import CommandPalette from "./CommandPalette.jsx";
 import PwaControls from "./PwaControls.jsx";
 import { startTour } from "../onboarding/tour.js";
+import ErrorBoundary from "./ErrorBoundary.jsx";
+import { PageSkeleton } from "./Skeleton.jsx";
 
 const SEV_DOT = { critical: "var(--red)", warning: "var(--yellow)", info: "var(--green)" };
 
@@ -107,6 +109,8 @@ function PlanMenu({ username, onSignOut }) {
 }
 
 // Navigation regroupée par domaine ; les libellés passent par i18n (FR/EN).
+// Le bloc « Marché » historique (13 liens à plat) est scindé : analyse marché
+// d'un côté, veille détaillants PokéStock FR de l'autre — scan visuel 2× plus court.
 const NAV_GROUPS = [
   {
     section: "nav.section.market",
@@ -118,6 +122,11 @@ const NAV_GROUPS = [
       { to: "/future", key: "nav.future" },
       { to: "/analyzer", key: "nav.analyzer" },
       { to: "/watchlist", key: "nav.watchlist" },
+    ],
+  },
+  {
+    section: "nav.section.pokestock",
+    items: [
       { to: "/restock", key: "nav.restock" },
       { to: "/flip", key: "nav.flip" },
       { to: "/detaillants", key: "nav.detaillants" },
@@ -151,6 +160,40 @@ const THEME_SWATCH = {
   holo: "conic-gradient(from 210deg, #5B8CFF, #B89CFF, #FFCB2E, #34E2A4, #5B8CFF)",
   ember: "linear-gradient(150deg, #FF8A3D, #FF5E54)",
 };
+
+// Corps de navigation partagé entre la sidebar desktop et le tiroir mobile.
+function SidebarNav({ t, onNavigate }) {
+  return (
+    <nav className="flex flex-col gap-4" aria-label={t("nav.section.market")}>
+      {NAV_GROUPS.map((group) => (
+        <div key={group.section} className="flex flex-col gap-1">
+          <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
+            {t(group.section)}
+          </div>
+          {group.items.map((n) => (
+            <NavLink
+              key={n.to}
+              to={n.to}
+              onClick={onNavigate}
+              className={({ isActive }) =>
+                `rounded-lg px-3 py-2 text-sm transition-colors ${
+                  isActive ? "font-semibold text-slate-100" : "text-slate-400 hover:bg-slate-800/50"
+                }`
+              }
+              style={({ isActive }) =>
+                isActive
+                  ? { background: "var(--tab-active-bg)", border: "1px solid var(--tab-active-border)" }
+                  : { border: "1px solid transparent" }
+              }
+            >
+              {t(n.key)}
+            </NavLink>
+          ))}
+        </div>
+      ))}
+    </nav>
+  );
+}
 
 function Logo() {
   return (
@@ -190,6 +233,7 @@ function ThemeSwitcher() {
           onClick={() => setTheme(th)}
           title={t(`theme.${th}`)}
           aria-label={t(`theme.${th}`)}
+          aria-pressed={theme === th}
           style={{
             width: 18,
             height: 18,
@@ -197,8 +241,8 @@ function ThemeSwitcher() {
             background: THEME_SWATCH[th],
             cursor: "pointer",
             border: "1px solid var(--border-hover)",
-            outline: theme === th ? "2px solid var(--blue)" : "none",
-            outlineOffset: 1,
+            // Sélection via box-shadow → l'outline reste réservé au focus clavier.
+            boxShadow: theme === th ? "0 0 0 2px var(--bg), 0 0 0 4px var(--blue)" : "none",
           }}
         />
       ))}
@@ -236,7 +280,9 @@ export default function Layout() {
   const { t, setLang } = useI18n();
   const { setTheme } = useTheme();
   const navigate = useNavigate();
+  const location = useLocation();
   const [packOpen, setPackOpen] = useState(false);
+  const [navOpen, setNavOpen] = useState(false); // tiroir de navigation mobile
 
   // Relance la visite guidée depuis le Cockpit (les ancres y vivent).
   const replayTour = () => {
@@ -258,6 +304,7 @@ export default function Layout() {
 
   return (
     <div className="flex min-h-screen flex-col">
+      <a href="#pa-main" className="pa-skip-link">{t("chrome.skip")}</a>
       <PackExperience open={packOpen} onClose={() => setPackOpen(false)} />
       <AlertToaster />
       <CommandPalette commands={commands} />
@@ -269,6 +316,17 @@ export default function Layout() {
           borderBottom: "1px solid var(--line)",
         }}
       >
+        <button
+          onClick={() => setNavOpen(true)}
+          className="rounded-lg p-2 text-slate-300 md:hidden"
+          style={{ border: "1px solid var(--border2)" }}
+          aria-label={t("chrome.menu")}
+          aria-expanded={navOpen}
+        >
+          <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" aria-hidden="true">
+            <line x1="3" y1="6" x2="21" y2="6" /><line x1="3" y1="12" x2="21" y2="12" /><line x1="3" y1="18" x2="21" y2="18" />
+          </svg>
+        </button>
         <Logo />
         <div className="flex-1" />
         <button
@@ -303,51 +361,45 @@ export default function Layout() {
         <ThemeSwitcher />
         <LangSwitcher />
         <AlertsMenu />
-        <PlanMenu username={username} onSignOut={() => { signOut(); navigate("/login"); }} />
+        <PlanMenu username={username} onSignOut={() => { invalidatePollingCache(); signOut(); navigate("/login"); }} />
       </header>
 
       <div className="flex flex-1">
         {/* Sidebar réskinée */}
         <aside
           data-tour="sidebar"
-          className="w-56 shrink-0 p-3"
+          className="hidden w-56 shrink-0 p-3 md:block"
           style={{ borderRight: "1px solid var(--line)", background: "var(--panel)" }}
         >
-          <nav className="flex flex-col gap-4" aria-label={t("nav.section.market")}>
-            {NAV_GROUPS.map((group) => (
-              <div key={group.section} className="flex flex-col gap-1">
-                <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
-                  {t(group.section)}
-                </div>
-                {group.items.map((n) => (
-                  <NavLink
-                    key={n.to}
-                    to={n.to}
-                    className={({ isActive }) =>
-                      `rounded-lg px-3 py-2 text-sm transition-colors ${
-                        isActive
-                          ? "font-semibold text-slate-100"
-                          : "text-slate-400 hover:bg-slate-800/50"
-                      }`
-                    }
-                    style={({ isActive }) =>
-                      isActive
-                        ? { background: "var(--tab-active-bg)", border: "1px solid var(--tab-active-border)" }
-                        : { border: "1px solid transparent" }
-                    }
-                  >
-                    {t(n.key)}
-                  </NavLink>
-                ))}
-              </div>
-            ))}
-          </nav>
+          <SidebarNav t={t} />
         </aside>
 
-        <main className="flex-1 overflow-x-hidden">
+        {/* Tiroir de navigation mobile (le sidebar est masqué < md) */}
+        {navOpen && (
+          <div className="fixed inset-0 z-[60] md:hidden" role="dialog" aria-modal="true">
+            <div className="absolute inset-0" style={{ background: "rgba(6,4,16,.6)", backdropFilter: "blur(4px)" }}
+                 onClick={() => setNavOpen(false)} />
+            <div className="absolute inset-y-0 left-0 w-64 overflow-y-auto p-3"
+                 style={{ background: "var(--panel-solid)", borderRight: "1px solid var(--border2)" }}>
+              <div className="mb-3 flex items-center justify-between px-1">
+                <Logo />
+                <button onClick={() => setNavOpen(false)} aria-label={t("common.close")}
+                        className="h-8 w-8 rounded-lg text-slate-400"
+                        style={{ border: "1px solid var(--border2)" }}>✕</button>
+              </div>
+              <SidebarNav t={t} onNavigate={() => setNavOpen(false)} />
+            </div>
+          </div>
+        )}
+
+        <main id="pa-main" className="flex-1 overflow-x-hidden" tabIndex={-1}>
           <Ticker />
           <div className="p-5 pa-pagein">
-            <Outlet />
+            <ErrorBoundary resetKey={location.pathname}>
+              <Suspense fallback={<PageSkeleton />}>
+                <Outlet />
+              </Suspense>
+            </ErrorBoundary>
           </div>
         </main>
       </div>

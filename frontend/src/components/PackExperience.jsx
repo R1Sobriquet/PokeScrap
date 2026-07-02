@@ -1,4 +1,4 @@
-import { Suspense, lazy, useMemo, useState } from "react";
+import { Suspense, lazy, useEffect, useMemo, useState } from "react";
 import { useI18n } from "../i18n.jsx";
 import { Confetti } from "./motion.jsx";
 import PackModal from "./PackModal.jsx"; // repli 2D (CSS) si WebGL indispo
@@ -36,13 +36,23 @@ function Pack3DModal({ open, onClose }) {
   const { t } = useI18n();
   const [ripped, setRipped] = useState(false);
   const [cards, setCards] = useState(draw);
-  if (!open) return null;
 
   const close = () => { setRipped(false); setCards(draw()); onClose(); };
   const again = () => { setCards(draw()); setRipped(false); };
 
+  // Échap ferme le modal (accessibilité clavier).
+  useEffect(() => {
+    if (!open) return undefined;
+    const onKey = (e) => { if (e.key === "Escape") close(); };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  if (!open) return null;
+
   return (
-    <div style={{ position: "fixed", inset: 0, zIndex: 300, background: "rgba(6,4,16,.86)", backdropFilter: "blur(16px)",
+    <div role="dialog" aria-modal="true" aria-label={t("pack.cta")}
+      style={{ position: "fixed", inset: 0, zIndex: 450, background: "rgba(6,4,16,.86)", backdropFilter: "blur(16px)",
       display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center" }}>
       <button onClick={close} style={{ position: "absolute", top: 24, right: 28, width: 38, height: 38, borderRadius: 12,
         border: "1px solid rgba(255,255,255,.2)", background: "rgba(255,255,255,.07)", color: "#F2F5FB", fontSize: 16, cursor: "pointer" }}>✕</button>

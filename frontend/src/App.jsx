@@ -1,37 +1,44 @@
+import { lazy } from "react";
 import { BrowserRouter, Navigate, Route, Routes } from "react-router-dom";
+import { MotionConfig } from "framer-motion";
 import { AuthProvider } from "./AuthContext.jsx";
 import { ThemeProvider } from "./ThemeContext.jsx";
 import { I18nProvider } from "./i18n.jsx";
 import ProtectedRoute from "./ProtectedRoute.jsx";
 import Layout from "./components/Layout.jsx";
+// Landing et Login restent EAGER : premier écran instantané (et rendus
+// synchrones attendus par les tests). Toutes les pages protégées sont lazy →
+// code-splitting par route (le shell charge sans recharts ni pages).
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
-import Cockpit from "./pages/Cockpit.jsx";
-import Opportunities from "./pages/Opportunities.jsx";
-import Portfolio from "./pages/Portfolio.jsx";
-import Watchlist from "./pages/Watchlist.jsx";
-import Sets from "./pages/Sets.jsx";
-import Lots from "./pages/Lots.jsx";
-import Ledger from "./pages/Ledger.jsx";
-import Grading from "./pages/Grading.jsx";
-import Jobs from "./pages/Jobs.jsx";
-import Restock from "./pages/Restock.jsx";
-import FlipRadar from "./pages/FlipRadar.jsx";
-import Retailers from "./pages/Retailers.jsx";
-import Stores from "./pages/Stores.jsx";
-import BuyRules from "./pages/BuyRules.jsx";
-import Calendar from "./pages/Calendar.jsx";
-import FutureRadar from "./pages/FutureRadar.jsx";
-import DealAnalyzer from "./pages/DealAnalyzer.jsx";
-import SetExplorer from "./pages/SetExplorer.jsx";
-import SetDetail from "./pages/SetDetail.jsx";
-import Settings from "./pages/Settings.jsx";
+
+const Cockpit = lazy(() => import("./pages/Cockpit.jsx"));
+const Opportunities = lazy(() => import("./pages/Opportunities.jsx"));
+const Portfolio = lazy(() => import("./pages/Portfolio.jsx"));
+const Watchlist = lazy(() => import("./pages/Watchlist.jsx"));
+const Sets = lazy(() => import("./pages/Sets.jsx"));
+const Lots = lazy(() => import("./pages/Lots.jsx"));
+const Ledger = lazy(() => import("./pages/Ledger.jsx"));
+const Grading = lazy(() => import("./pages/Grading.jsx"));
+const Jobs = lazy(() => import("./pages/Jobs.jsx"));
+const Restock = lazy(() => import("./pages/Restock.jsx"));
+const FlipRadar = lazy(() => import("./pages/FlipRadar.jsx"));
+const Retailers = lazy(() => import("./pages/Retailers.jsx"));
+const Stores = lazy(() => import("./pages/Stores.jsx"));
+const BuyRules = lazy(() => import("./pages/BuyRules.jsx"));
+const Calendar = lazy(() => import("./pages/Calendar.jsx"));
+const FutureRadar = lazy(() => import("./pages/FutureRadar.jsx"));
+const DealAnalyzer = lazy(() => import("./pages/DealAnalyzer.jsx"));
+const SetExplorer = lazy(() => import("./pages/SetExplorer.jsx"));
+const SetDetail = lazy(() => import("./pages/SetDetail.jsx"));
+const Settings = lazy(() => import("./pages/Settings.jsx"));
 
 export default function App() {
   return (
     <ThemeProvider>
       <I18nProvider>
         <AuthProvider>
+          <MotionConfig reducedMotion="user">
           <BrowserRouter>
         <Routes>
           <Route path="/" element={<Landing />} />
@@ -67,6 +74,7 @@ export default function App() {
           <Route path="*" element={<Navigate to="/cockpit" replace />} />
         </Routes>
           </BrowserRouter>
+          </MotionConfig>
         </AuthProvider>
       </I18nProvider>
     </ThemeProvider>
