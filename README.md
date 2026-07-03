@@ -109,6 +109,17 @@ analyse (action manuelle). Le matching offre↔produit interne
 (`retail_offers.product_id`, FK nullable) reste manuel/best-effort ; pas de
 fuzzy-matching automatique persistant.
 
+### Temps réel — flux SSE
+
+`GET /events/stream?token=<JWT>` (Server-Sent Events) : le backend sonde sa
+base en local (bon marché) et **pousse** un événement quand l'état change —
+nouvelle alerte pending (`alerts`), changement de stock retail (`offers`) —
+avec les chemins d'API à revalider. Le frontend (hook `useEventStream`,
+monté dans le shell) revalide alors le cache partagé : toasts et ticker
+deviennent temps réel. Le **polling reste en filet de sécurité** (si le flux
+tombe : backoff exponentiel, rien ne casse). JWT en query string car
+`EventSource` ne pose pas d'en-têtes (app locale/Tailscale uniquement).
+
 ### Frontend PokéAlpha (reskin)
 
 Le dashboard adopte le design **PokéAlpha** : 4 thèmes runtime (dark/light/holo/

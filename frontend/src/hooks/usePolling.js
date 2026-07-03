@@ -61,6 +61,13 @@ export function invalidatePollingCache() {
   store.clear();
 }
 
+// Revalidation ciblée (poussée par le flux SSE) : ne touche que les chemins
+// déjà en cache — un chemin jamais demandé n'est pas préchargé.
+export function revalidatePath(path) {
+  const e = store.get(path);
+  if (e && e.token) revalidate(path, e.token);
+}
+
 export function usePolling(path, { intervalSec = 30, enabled = true } = {}) {
   const { token } = useAuth();
   const intervalRef = useRef(intervalSec);

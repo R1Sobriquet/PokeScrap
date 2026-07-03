@@ -4,6 +4,7 @@ import { useAuth } from "../AuthContext.jsx";
 import { useTheme, THEMES } from "../ThemeContext.jsx";
 import { useI18n, LANGS } from "../i18n.jsx";
 import { usePolling, invalidatePollingCache } from "../hooks/usePolling.js";
+import { useEventStream } from "../hooks/useEventStream.js";
 import PackExperience from "./PackExperience.jsx";
 import Ticker from "./Ticker.jsx";
 import AlertToaster from "./AlertToaster.jsx";
@@ -283,6 +284,7 @@ export default function Layout() {
   const location = useLocation();
   const [packOpen, setPackOpen] = useState(false);
   const [navOpen, setNavOpen] = useState(false); // tiroir de navigation mobile
+  useEventStream(); // push SSE → revalide le cache partagé (polling = filet)
 
   // Relance la visite guidée depuis le Cockpit (les ancres y vivent).
   const replayTour = () => {
