@@ -56,7 +56,7 @@ export default function Grading() {
         Rappels : coût élevé (PSA ~80€ + logistique), capital immobilisé plusieurs mois, et le pop
         report surestime les hauts grades (biais de survie) — défaut conservateur. Plancher 100€.
       </div>
-      <Card><Table columns={cols} rows={opps || []} empty="Aucune opportunité de grading" /></Card>
+      <Card><Table columns={cols} rows={opps || []} empty={t("grading.empty")} /></Card>
     </div>
   );
 }

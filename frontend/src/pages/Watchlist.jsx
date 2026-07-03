@@ -168,7 +168,7 @@ export default function Watchlist() {
             </div>
           </form>
         )}
-        <Table columns={cols} rows={rows} empty="Watchlist vide" />
+        <Table columns={cols} rows={rows} empty={t("watchlist.empty")} />
       </Card>
     </div>
   );

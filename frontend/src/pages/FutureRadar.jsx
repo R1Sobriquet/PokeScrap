@@ -1,7 +1,7 @@
 import { usePolling } from "../hooks/usePolling.js";
+import { panel } from "../components/ui.jsx";
 import { useI18n } from "../i18n.jsx";
 
-const panel = { background: "var(--panel)", border: "1px solid var(--border2)" };
 
 // Score pseudo-déterministe par produit (stable au refresh). PLACEHOLDER : sera
 // remplacé par un vrai modèle prédictif (hype / confiance / popularité / ROI).

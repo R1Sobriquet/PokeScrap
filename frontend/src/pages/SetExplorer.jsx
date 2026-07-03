@@ -1,10 +1,9 @@
 import { useNavigate } from "react-router-dom";
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
-import { PageHeader, pct } from "../components/ui.jsx";
+import { PageHeader, panel, pct } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 
-const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
 export default function SetExplorer() {
   const navigate = useNavigate();

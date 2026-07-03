@@ -40,7 +40,7 @@ export default function Ledger() {
       )}
 
       <Card title="Grand livre (transactions)">
-        <Table columns={cols} rows={txs || []} empty="Aucune transaction" />
+        <Table columns={cols} rows={txs || []} empty={t("ledger.empty")} />
       </Card>
     </div>
   );

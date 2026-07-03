@@ -2,6 +2,27 @@
 // design PokéAlpha. Le palette Tailwind (slate/info/warning/critical) est adossé
 // aux variables de thème, donc ces primitives basculent sur les 4 thèmes.
 
+import { useI18n } from "../i18n.jsx";
+
+// Style « panneau » canonique (source unique — était copié-collé dans 7 pages).
+export const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
+
+// Petit indicateur libellé + valeur mono (source unique — existait en 2 variantes).
+// `lg` : taille Cockpit (18px gras) ; défaut : taille carte compacte (14px).
+export function Stat({ label, value, color, lg = false }) {
+  return (
+    <div>
+      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</div>
+      <div
+        className={lg ? "mt-0.5 font-mono text-[18px] font-bold" : "mt-1 font-mono text-[14px] font-semibold"}
+        style={color ? { color } : undefined}
+      >
+        {value}
+      </div>
+    </div>
+  );
+}
+
 // En-tête de page « terminal » : gros titre + sous-titre mono, pastille et slot
 // d'action optionnels. Standardise le haut de chaque écran.
 export function PageHeader({ title, subtitle, badge, right }) {
@@ -25,7 +46,8 @@ export function PageHeader({ title, subtitle, badge, right }) {
 }
 
 // Classes/style partagés pour les champs de formulaire (look terminal).
-export const inputCls = "rounded-lg border px-2.5 py-1.5 text-sm text-slate-100 outline-none";
+// Plus d'`outline-none` : le focus clavier reste visible via le :focus-visible global.
+export const inputCls = "rounded-lg border px-2.5 py-1.5 text-sm text-slate-100";
 export const inputStyle = { borderColor: "var(--border2)", background: "var(--panel2)" };
 
 export function Card({ title, children, right }) {
@@ -72,9 +94,10 @@ export function Badge({ children, severity = "info" }) {
   );
 }
 
-export function Table({ columns, rows, empty = "Aucune donnée" }) {
+export function Table({ columns, rows, empty }) {
+  const { t } = useI18n();
   if (!rows || rows.length === 0) {
-    return <div className="py-6 text-center text-sm text-slate-500">{empty}</div>;
+    return <div className="py-6 text-center text-sm text-slate-500">{empty ?? t("common.empty")}</div>;
   }
   return (
     <div className="overflow-x-auto">

@@ -2,7 +2,7 @@ import { useNavigate } from "react-router-dom";
 import { LineChart, Line, XAxis, YAxis, Tooltip, ResponsiveContainer } from "recharts";
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
-import { eur, pct } from "../components/ui.jsx";
+import { Stat, eur, panel, pct } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 import HoloCard from "../components/HoloCard.jsx";
 import { CountUp, Confetti } from "../components/motion.jsx";
@@ -11,7 +11,6 @@ import { CockpitSkeleton } from "../components/Skeleton.jsx";
 
 const money = (v) => `${(Number(v) || 0).toFixed(2)} €`;
 
-const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
 // Carte « jauge » du design : label mono, pastille d'état, grande valeur mono,
 // barre de progression animée, légende.
@@ -42,15 +41,6 @@ function GaugeCard({ label, value, count, fmt, pill, pillColor, pillBg, barPct, 
         />
       </div>
       {caption && <div className="mt-2.5 text-[12.5px] text-slate-500">{caption}</div>}
-    </div>
-  );
-}
-
-function Stat({ label, value, color }) {
-  return (
-    <div>
-      <div className="font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500">{label}</div>
-      <div className="mt-0.5 font-mono text-[18px] font-bold" style={color ? { color } : undefined}>{value}</div>
     </div>
   );
 }
@@ -130,10 +120,10 @@ export default function Cockpit() {
                 <div className="mt-2 text-2xl font-extrabold tracking-tight">{deal.title || deal.product_name}</div>
                 <div className="mt-1 font-mono text-[11px] tracking-[0.12em] text-slate-500">{deal.retailer}</div>
                 <div className="mt-4 flex flex-wrap items-center gap-5">
-                  <Stat label="MSRP" value={eur(deal.retail_price)} />
-                  <Stat label={t("cockpit.deal.market")} value={eur(deal.market_value)} />
-                  <Stat label={t("flip.col.upside")} value={`${(deal.net_upside_pct ?? 0) >= 0 ? "+" : ""}${deal.net_upside_pct}%`} color="var(--green-text)" />
-                  <Stat label={t("flip.col.profit")} value={eur(deal.est_profit)} color="var(--gold)" />
+                  <Stat lg label="MSRP" value={eur(deal.retail_price)} />
+                  <Stat lg label={t("cockpit.deal.market")} value={eur(deal.market_value)} />
+                  <Stat lg label={t("flip.col.upside")} value={`${(deal.net_upside_pct ?? 0) >= 0 ? "+" : ""}${deal.net_upside_pct}%`} color="var(--green-text)" />
+                  <Stat lg label={t("flip.col.profit")} value={eur(deal.est_profit)} color="var(--gold)" />
                 </div>
                 <div className="mt-5 flex flex-wrap gap-2.5">
                   <a href={deal.url} target="_blank" rel="noreferrer" className="rounded-xl px-4 py-2.5 text-sm font-bold text-ink"

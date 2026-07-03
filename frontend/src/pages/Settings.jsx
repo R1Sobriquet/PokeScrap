@@ -86,7 +86,7 @@ export default function Settings() {
       </div>
 
       <Card title="Table settings (édition typée)">
-        <Table columns={cols} rows={settings} empty="Aucun réglage" />
+        <Table columns={cols} rows={settings} empty={t("settings.empty")} />
       </Card>
     </div>
   );

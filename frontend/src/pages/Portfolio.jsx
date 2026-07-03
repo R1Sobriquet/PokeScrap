@@ -1,10 +1,9 @@
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
-import { eur } from "../components/ui.jsx";
+import { Stat, eur, panel } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 import TiltCard from "../components/TiltCard.jsx";
 
-const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
 function StageBadges({ r, t }) {
   const s = r.stages || {};
@@ -19,15 +18,6 @@ function StageBadges({ r, t }) {
   if (s.forced) out.push(chip("f", t("portfolio.stage.forced"), "var(--red-text)", "rgba(244,88,95,.1)"));
   if (r.is_speculative_reserve) out.push(chip("r", t("portfolio.stage.reserve"), "var(--blue-soft)", "rgba(61,123,255,.12)"));
   return out.length ? <div className="flex flex-wrap gap-1">{out}</div> : null;
-}
-
-function Stat({ label, value, color }) {
-  return (
-    <div>
-      <div className="font-mono text-[8.5px] uppercase tracking-[0.11em] text-slate-500">{label}</div>
-      <div className="mt-1 font-mono text-[14px] font-semibold" style={color ? { color } : undefined}>{value}</div>
-    </div>
-  );
 }
 
 export default function Portfolio() {

@@ -3,10 +3,9 @@ import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
-import { eur } from "../components/ui.jsx";
+import { eur, panel } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 
-const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
 const STATE = {
   in_stock: { color: "var(--green-text)", bg: "rgba(52,211,153,.12)" },

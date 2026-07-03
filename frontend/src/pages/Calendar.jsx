@@ -78,7 +78,7 @@ export default function Calendar() {
       </Card>
 
       <Card title="Sorties à venir">
-        <Table columns={cols} rows={releases || []} empty="Aucune sortie planifiée" />
+        <Table columns={cols} rows={releases || []} empty={t("calendar.empty")} />
       </Card>
     </div>
   );

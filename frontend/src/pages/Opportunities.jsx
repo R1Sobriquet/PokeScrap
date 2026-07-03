@@ -53,9 +53,9 @@ export default function Opportunities() {
       </div>
       <Card>
         {tab === "active" ? (
-          <Table columns={cols} rows={active} empty="Aucune opportunité active" />
+          <Table columns={cols} rows={active} empty={t("opps.empty.active")} />
         ) : (
-          <Table columns={blockedCols} rows={blocked} empty="Aucune annonce bloquée" />
+          <Table columns={blockedCols} rows={blocked} empty={t("opps.empty.blocked")} />
         )}
       </Card>
     </div>

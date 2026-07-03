@@ -1,7 +1,7 @@
 import { ResponsiveContainer, Treemap } from "recharts";
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
-import { PageHeader, eur } from "../components/ui.jsx";
+import { PageHeader, eur, panel } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 import TiltCard from "../components/TiltCard.jsx";
 
@@ -44,7 +44,6 @@ function MoneyMap({ opps, t }) {
   );
 }
 
-const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 const GRID = "32px minmax(0,1fr) 92px 116px 74px 78px 96px 86px 108px";
 
 const STATE = {

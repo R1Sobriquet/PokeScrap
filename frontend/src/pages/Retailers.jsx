@@ -58,7 +58,7 @@ export default function Retailers() {
     <div className="space-y-4">
       <PageHeader title={t("nav.detaillants")} subtitle={t("retailers.subtitle")} />
       <Card title="Cibles de veille (Cultura · Fnac · Micromania)">
-        <Table columns={cols} rows={retailers || []} empty="Aucun détaillant" />
+        <Table columns={cols} rows={retailers || []} empty={t("retailers.empty")} />
         <p className="mt-2 text-xs text-slate-500">
           Le <b>flag settings</b> (<code>retail_&lt;code&gt;_enabled</code>) coupe un détaillant sans
           le désactiver. Le <b>circuit breaker</b> s'ouvre après plusieurs erreurs consécutives

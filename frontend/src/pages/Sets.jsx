@@ -115,7 +115,7 @@ export default function Sets() {
             </div>
           </form>
         )}
-        <Table columns={setCols} rows={sets || []} empty="Aucun set suivi" />
+        <Table columns={setCols} rows={sets || []} empty={t("sets.empty")} />
         <p className="mt-2 text-xs text-slate-500">
           Le job <code>sync-tracked-sets</code> peuple la watchlist (source=auto) sans
           écraser tes ajouts manuels. Respecte le quota PokeTrace (1×/jour).
@@ -124,7 +124,7 @@ export default function Sets() {
 
       <Card title="Top movers — le radar SIGNALE, il n'achète pas">
         <Table columns={moverCols} rows={movers || []}
-               empty="Aucun mover (volume insuffisant ou pas d'historique)" />
+               empty={t("sets.empty.movers")} />
         <p className="mt-2 text-xs text-slate-500">
           Hausse confirmée par le volume ; les achats restent soumis aux garde-fous
           (50 %, anti-pump, anti-FOMO, cash).

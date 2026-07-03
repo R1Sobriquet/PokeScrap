@@ -1,10 +1,9 @@
 import { useNavigate, useParams } from "react-router-dom";
 import { usePolling } from "../hooks/usePolling.js";
 import { useI18n } from "../i18n.jsx";
-import { eur, pct } from "../components/ui.jsx";
+import { eur, panel, pct } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 
-const panel = { background: "var(--panel)", border: "1px solid var(--border)" };
 
 function LockedPanel({ title, tag, tagColor, note, onUpgrade, t }) {
   return (

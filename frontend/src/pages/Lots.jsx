@@ -54,11 +54,11 @@ export default function Lots() {
     <div className="space-y-4">
       <PageHeader title={t("nav.lots")} subtitle={t("lots.subtitle")} />
       <Card title="Lots reçus">
-        <Table columns={lotCols} rows={lots || []} empty="Aucun lot (créés à l'exécution d'achat Discord)" />
+        <Table columns={lotCols} rows={lots || []} empty={t("lots.empty")} />
       </Card>
       {selected && (
         <Card title={`Items du lot #${selected}`}>
-          <Table columns={itemCols} rows={items || []} empty="Aucun item — lancez l'intake" />
+          <Table columns={itemCols} rows={items || []} empty={t("lots.empty.items")} />
         </Card>
       )}
     </div>

@@ -131,11 +131,11 @@ export default function BuyRules() {
           </div>
           {err && <p className="text-xs text-critical md:col-span-5">{err}</p>}
         </form>
-        <Table columns={ruleCols} rows={rules || []} empty="Aucune règle (rien ne sera carté)." />
+        <Table columns={ruleCols} rows={rules || []} empty={t("buyrules.empty.rules")} />
       </Card>
 
       <Card title="Journal des tentatives (audit)">
-        <Table columns={attCols} rows={attempts || []} empty="Aucune tentative." />
+        <Table columns={attCols} rows={attempts || []} empty={t("buyrules.empty.attempts")} />
       </Card>
     </div>
   );
