@@ -2,6 +2,7 @@
 // design PokéAlpha. Le palette Tailwind (slate/info/warning/critical) est adossé
 // aux variables de thème, donc ces primitives basculent sur les 4 thèmes.
 
+import { useMemo, useState } from "react";
 import { useI18n } from "../i18n.jsx";
 
 // Style « panneau » canonique (source unique — était copié-collé dans 7 pages).
@@ -122,6 +123,50 @@ export function Table({ columns, rows, empty }) {
         </tbody>
       </table>
     </div>
+  );
+}
+
+// Tri client des tableaux « terminal » (grilles maison). `accessors` : map
+// clé → fn(row) (à déclarer au niveau module pour rester stable). null/undefined
+// classés en dernier ; clic sur la colonne active inverse le sens.
+export function useSortable(rows, accessors, initial = { key: null, dir: "desc" }) {
+  const [sort, setSort] = useState(initial);
+  const toggle = (key) =>
+    setSort((s) => (s.key === key ? { key, dir: s.dir === "desc" ? "asc" : "desc" } : { key, dir: "desc" }));
+  const sorted = useMemo(() => {
+    const acc = sort.key && accessors[sort.key];
+    if (!acc) return rows;
+    const mul = sort.dir === "asc" ? 1 : -1;
+    return [...rows].sort((a, b) => {
+      const va = acc(a);
+      const vb = acc(b);
+      if (va == null && vb == null) return 0;
+      if (va == null) return 1;
+      if (vb == null) return -1;
+      if (typeof va === "string") return va.localeCompare(vb) * mul;
+      return (va - vb) * mul;
+    });
+  }, [rows, sort, accessors]);
+  return { sorted, sort, toggle };
+}
+
+// En-tête de colonne triable (bouton accessible, aria-sort, flèche d'état).
+export function SortHeader({ label, k, sort, onToggle, align = "left" }) {
+  const active = sort.key === k;
+  return (
+    <button
+      onClick={() => onToggle(k)}
+      aria-sort={active ? (sort.dir === "asc" ? "ascending" : "descending") : "none"}
+      className={`flex items-center gap-1 font-mono text-[9px] uppercase tracking-[0.12em] ${
+        align === "right" ? "justify-end text-right" : ""
+      } ${active ? "text-slate-300" : "text-slate-500 hover:text-slate-400"}`}
+      style={{ width: "100%" }}
+    >
+      {label}
+      <span aria-hidden="true" style={{ opacity: active ? 1 : 0.35 }}>
+        {active ? (sort.dir === "asc" ? "▲" : "▼") : "↕"}
+      </span>
+    </button>
   );
 }
 

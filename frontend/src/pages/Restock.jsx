@@ -3,7 +3,7 @@ import { usePolling } from "../hooks/usePolling.js";
 import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
-import { eur, panel } from "../components/ui.jsx";
+import { SortHeader, eur, panel, useSortable } from "../components/ui.jsx";
 import ProductImage from "../components/ProductImage.jsx";
 
 
@@ -18,6 +18,16 @@ const FLIP_TONE = {
   buy: { color: "var(--green-text)", bg: "rgba(52,211,153,.12)" },
   fair: { color: "var(--blue-soft)", bg: "rgba(61,123,255,.1)" },
   pass: { color: "var(--red-text)", bg: "rgba(244,88,95,.1)" },
+};
+
+// Accesseurs de tri (niveau module → identité stable pour useSortable).
+const SORTS = {
+  product: (o) => (o.title || o.url || "").toLowerCase(),
+  retailer: (o) => (o.retailer || "").toLowerCase(),
+  state: (o) => o.stock_state || "",
+  price: (o) => (o.price != null ? Number(o.price) : null),
+  market: (o) => (o.market_value != null ? Number(o.market_value) : null),
+  changed: (o) => o.last_changed_at || o.last_checked_at || "",
 };
 
 const GRID = "minmax(0,1fr) 88px 116px 72px 78px 112px 60px";
@@ -54,6 +64,7 @@ export default function Restock() {
   const [msg, setMsg] = useState(null);
 
   const list = offers || [];
+  const { sorted, sort, toggle } = useSortable(list, SORTS);
   const count = (s) => list.filter((o) => o.stock_state === s).length;
   const inStock = count("in_stock");
   const preorder = count("preorder");
@@ -155,19 +166,19 @@ export default function Restock() {
           className="grid items-center gap-2.5 border-b px-4 py-2.5 font-mono text-[9px] uppercase tracking-[0.12em] text-slate-500"
           style={{ borderColor: "var(--line)", gridTemplateColumns: GRID }}
         >
-          <div>{t("restock.col.product")}</div>
-          <div>{t("restock.col.retailer")}</div>
-          <div>{t("restock.col.state")}</div>
-          <div className="text-right">{t("restock.col.price")}</div>
-          <div className="text-right">{t("restock.col.market")}</div>
+          <SortHeader label={t("restock.col.product")} k="product" sort={sort} onToggle={toggle} />
+          <SortHeader label={t("restock.col.retailer")} k="retailer" sort={sort} onToggle={toggle} />
+          <SortHeader label={t("restock.col.state")} k="state" sort={sort} onToggle={toggle} />
+          <SortHeader label={t("restock.col.price")} k="price" sort={sort} onToggle={toggle} align="right" />
+          <SortHeader label={t("restock.col.market")} k="market" sort={sort} onToggle={toggle} align="right" />
           <div>{t("restock.col.flip")}</div>
-          <div className="text-right">{t("restock.col.changed")}</div>
+          <SortHeader label={t("restock.col.changed")} k="changed" sort={sort} onToggle={toggle} align="right" />
         </div>
 
-        {list.length === 0 ? (
+        {sorted.length === 0 ? (
           <div className="px-4 py-10 text-center text-sm text-slate-500">{t("restock.empty")}</div>
         ) : (
-          list.map((o) => {
+          sorted.map((o) => {
             const st = STATE[o.stock_state] || STATE.unknown;
             const ft = FLIP_TONE[o.verdict_tone];
             return (

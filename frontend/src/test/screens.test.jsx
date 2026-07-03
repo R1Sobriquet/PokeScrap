@@ -30,6 +30,7 @@ import Restock from "../pages/Restock.jsx";
 import Retailers from "../pages/Retailers.jsx";
 import Calendar from "../pages/Calendar.jsx";
 import SetExplorer from "../pages/SetExplorer.jsx";
+import FlipRadar from "../pages/FlipRadar.jsx";
 import Layout from "../components/Layout.jsx";
 import App from "../App.jsx";
 
@@ -71,6 +72,39 @@ describe("Settings — bascule Pro", () => {
     await waitFor(() => expect(h.post).toHaveBeenCalled());
     expect(h.post.mock.calls[0][1]).toBe("/settings/switch-pro");
     expect(h.post.mock.calls[0][2]).toEqual({ to_pro: true });
+  });
+});
+
+describe("Flip Radar — tri + tiroir de détail", () => {
+  const OPPS = [
+    { offer_id: 1, title: "Cheap Box", retailer: "Fnac", stock_state: "in_stock",
+      retail_price: 10, market_value: 20, net_upside_pct: 50, est_profit: 5,
+      verdict: "BUY", verdict_tone: "buy", url: "https://a/x" },
+    { offer_id: 2, title: "Pricey Box", retailer: "Cultura", stock_state: "in_stock",
+      retail_price: 99, market_value: 150, net_upside_pct: 30, est_profit: 20,
+      verdict: "FAIR", verdict_tone: "fair", url: "https://b/y" },
+  ];
+
+  it("trie par prix au clic (desc puis asc)", () => {
+    h.polled["/retail/opportunities"] = OPPS;
+    wrap(<FlipRadar />);
+    const rowTitles = () =>
+      screen.getAllByRole("button").filter((b) => /voir le détail/.test(b.getAttribute("aria-label") || ""))
+        .map((b) => b.getAttribute("aria-label"));
+    fireEvent.click(screen.getByText("PRIX (MSRP)"));
+    expect(rowTitles()[0]).toMatch(/Pricey Box/); // desc au 1er clic
+    fireEvent.click(screen.getByText("PRIX (MSRP)"));
+    expect(rowTitles()[0]).toMatch(/Cheap Box/); // asc au 2e clic
+  });
+
+  it("ouvre le tiroir de détail au clic sur une ligne", () => {
+    h.polled["/retail/opportunities"] = OPPS;
+    wrap(<FlipRadar />);
+    fireEvent.click(screen.getByLabelText(/Cheap Box — voir le détail/));
+    const dialog = screen.getByRole("dialog");
+    expect(dialog).toBeInTheDocument();
+    expect(dialog.textContent).toContain("Cheap Box");
+    expect(dialog.textContent).toContain("10.00 €"); // MSRP dans le tiroir
   });
 });
 
