@@ -11,7 +11,7 @@ from pydantic import BaseModel
 from sqlalchemy import func, select
 from sqlalchemy.orm import Session
 
-from app.auth.security import get_current_user
+from app.auth.security import get_current_user, require_admin
 from app.config import get_setting, invalidate_setting
 from app.db import get_db
 from app.models import (
@@ -70,7 +70,7 @@ class SettingUpdate(BaseModel):
     value: str
 
 
-@router.put("/settings/{key}")
+@router.put("/settings/{key}", dependencies=[Depends(require_admin)])
 def update_setting(key: str, payload: SettingUpdate, db: Session = Depends(get_db)) -> dict:
     setting = db.scalar(select(Setting).where(Setting.setting_key == key))
     if setting is None:
@@ -85,7 +85,7 @@ class SwitchPro(BaseModel):
     to_pro: bool = True
 
 
-@router.post("/settings/switch-pro")
+@router.post("/settings/switch-pro", dependencies=[Depends(require_admin)])
 def switch_pro(payload: SwitchPro, db: Session = Depends(get_db)) -> dict:
     values = _PRO_VALUES if payload.to_pro else _FREE_VALUES
     updated = {}
@@ -147,7 +147,7 @@ def _job_run_dict(r) -> dict:
     }
 
 
-@router.post("/admin/jobs/{job_name}/run")
+@router.post("/admin/jobs/{job_name}/run", dependencies=[Depends(require_admin)])
 def run_job(job_name: str, background: BackgroundTasks, db: Session = Depends(get_db)) -> dict:
     """Démarre un job en arrière-plan (réponse immédiate). 409 si déjà en cours."""
     if job_name not in jobs_service.JOBS:
@@ -159,7 +159,7 @@ def run_job(job_name: str, background: BackgroundTasks, db: Session = Depends(ge
     return {"job_run_id": run_id, "job_name": job_name, "status": "running"}
 
 
-@router.get("/admin/jobs/recent")
+@router.get("/admin/jobs/recent", dependencies=[Depends(require_admin)])
 def jobs_recent(db: Session = Depends(get_db)) -> dict:
     from app.models import MlModel
 
@@ -369,7 +369,7 @@ class RetailerUpdate(BaseModel):
     reset_circuit: bool | None = None
 
 
-@router.put("/retail/retailers/{retailer_id}")
+@router.put("/retail/retailers/{retailer_id}", dependencies=[Depends(require_admin)])
 def update_retailer(retailer_id: int, payload: RetailerUpdate, db: Session = Depends(get_db)) -> dict:
     r = db.get(Retailer, retailer_id)
     if r is None:
@@ -726,7 +726,7 @@ def _parse_date(value: str | None):
         raise HTTPException(status_code=400, detail="Date invalide (AAAA-MM-JJ)") from exc
 
 
-@router.post("/releases")
+@router.post("/releases", dependencies=[Depends(require_admin)])
 def create_release(payload: ReleaseIn, db: Session = Depends(get_db)) -> dict:
     if not (payload.product_name or "").strip():
         raise HTTPException(status_code=400, detail="Le nom du produit est requis")
@@ -742,7 +742,7 @@ def create_release(payload: ReleaseIn, db: Session = Depends(get_db)) -> dict:
     return _release_dict(r, db)
 
 
-@router.put("/releases/{release_id}")
+@router.put("/releases/{release_id}", dependencies=[Depends(require_admin)])
 def update_release(release_id: int, payload: ReleaseIn, db: Session = Depends(get_db)) -> dict:
     r = db.get(Release, release_id)
     if r is None:
@@ -757,7 +757,7 @@ def update_release(release_id: int, payload: ReleaseIn, db: Session = Depends(ge
     return _release_dict(r, db)
 
 
-@router.delete("/releases/{release_id}")
+@router.delete("/releases/{release_id}", dependencies=[Depends(require_admin)])
 def delete_release(release_id: int, db: Session = Depends(get_db)) -> dict:
     r = db.get(Release, release_id)
     if r is None:

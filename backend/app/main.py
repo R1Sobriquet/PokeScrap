@@ -16,7 +16,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy import text
 
 from app.api import api_router
-from app.auth.security import ensure_admin_hash
+from app.auth.security import ensure_admin_hash, ensure_admin_user
 from app.config import get_settings
 from app.db import SessionLocal, check_db, engine
 from app.logging_config import setup_logging
@@ -73,6 +73,7 @@ async def lifespan(app: FastAPI):
     with SessionLocal() as db:
         ensure_runtime_settings(db)
         ensure_default_tracked_sets(db)
+        ensure_admin_user(db)  # migre l'admin .env vers la table users (idempotent)
     logger.info("Backend prêt.")
     yield
     logger.info("Arrêt backend.")

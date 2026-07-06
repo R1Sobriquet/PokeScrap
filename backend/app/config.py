@@ -36,9 +36,18 @@ class Settings(BaseSettings):
 
     # --- Auth ---
     jwt_secret: str = "change_me"
-    jwt_expire_min: int = 720
+    #: Durée de l'access token — court depuis l'auth v2 (le refresh cookie
+    #: httpOnly maintient la session, voir auth/security.py).
+    jwt_expire_min: int = 15
+    refresh_expire_days: int = 30
+    #: Secure sur le cookie refresh — false en dev http, true derrière Caddy/TLS.
+    cookie_secure: bool = False
     admin_username: str = "erwann"
     admin_password: str = "change_me"
+    #: Email de la ligne ``users`` de l'admin (migration multi-utilisateurs).
+    admin_email: str = "admin@localhost"
+    #: Coupe le rate limiting (tests uniquement — jamais false en prod publique).
+    rate_limit_enabled: bool = True
 
     # --- MySQL ---
     db_host: str = "db"

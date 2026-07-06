@@ -6,6 +6,7 @@ tables exploitées par les jalons en cours (le reste viendra au fil des jalons).
 
 from app.models.account_snapshot import AccountSnapshot
 from app.models.alert import Alert
+from app.models.auth_session import AuthSession
 from app.models.buy_attempt import BuyAttempt
 from app.models.buy_rule import BuyRule
 from app.models.card_price_snapshot import CardPriceSnapshot
@@ -14,6 +15,7 @@ from app.models.daily_signal import DailySignal
 from app.models.grading_opportunity import GradingOpportunity
 from app.models.job_run import JobRun
 from app.models.data_quarantine import DataQuarantine
+from app.models.email_token import EmailToken
 from app.models.lot import Lot
 from app.models.lot_item import LotItem
 from app.models.market_price_snapshot import MarketPriceSnapshot
@@ -36,17 +38,20 @@ from app.models.tier import TierConfig
 from app.models.popularity_tier import PopularityTier
 from app.models.tracked_set import TrackedSet
 from app.models.transaction import Transaction
+from app.models.user import User
 from app.models.watchlist import Watchlist
 
 __all__ = [
     "AccountSnapshot",
     "Alert",
+    "AuthSession",
     "BuyAttempt",
     "BuyRule",
     "CardPriceSnapshot",
     "CatalystEvent",
     "DailySignal",
     "DataQuarantine",
+    "EmailToken",
     "GradingOpportunity",
     "JobRun",
     "Lot",
@@ -71,5 +76,6 @@ __all__ = [
     "TierConfig",
     "TrackedSet",
     "Transaction",
+    "User",
     "Watchlist",
 ]

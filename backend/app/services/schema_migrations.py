@@ -289,6 +289,63 @@ CREATE TABLE IF NOT EXISTS daily_signals (
 """
 
 
+# ---------------------------------------------------------------------------
+#  Multi-utilisateurs (Phase A) — identités, sessions refresh, jetons email.
+#  L'admin historique (.env) est créé idempotemment au boot (ensure_admin_user).
+# ---------------------------------------------------------------------------
+
+_USERS_DDL = """
+CREATE TABLE IF NOT EXISTS users (
+    id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    email             VARCHAR(255) NOT NULL,
+    username          VARCHAR(64)  NOT NULL,
+    password_hash     VARCHAR(255) NOT NULL,
+    role              ENUM('admin','user') NOT NULL DEFAULT 'user',
+    plan              ENUM('free','pro')   NOT NULL DEFAULT 'free',
+    status            ENUM('pending','active','disabled') NOT NULL DEFAULT 'pending',
+    email_verified_at DATETIME     NULL,
+    current_tier      SMALLINT     NULL,
+    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_email (email),
+    UNIQUE KEY uq_user_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_AUTH_SESSIONS_DDL = """
+CREATE TABLE IF NOT EXISTS auth_sessions (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT UNSIGNED NOT NULL,
+    refresh_hash CHAR(64)     NOT NULL,
+    expires_at   DATETIME     NOT NULL,
+    revoked_at   DATETIME     NULL,
+    user_agent   VARCHAR(255) NULL,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_session_refresh (refresh_hash),
+    KEY idx_session_user (user_id, expires_at),
+    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_EMAIL_TOKENS_DDL = """
+CREATE TABLE IF NOT EXISTS email_tokens (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    purpose    ENUM('verify','reset') NOT NULL,
+    token_hash CHAR(64)  NOT NULL,
+    expires_at DATETIME  NOT NULL,
+    used_at    DATETIME  NULL,
+    created_at DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_email_token (token_hash),
+    KEY idx_email_token_user (user_id, purpose),
+    CONSTRAINT fk_email_token_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+
 def _add_col(conn, db_name: str, table: str, column: str, ddl: str) -> None:
     """ALTER ADD COLUMN gardé par information_schema (idempotent)."""
     exists = conn.execute(text(
@@ -521,3 +578,8 @@ def ensure_schema_upgrades(engine: Engine) -> None:
                  "ALTER TABLE products ADD COLUMN tcgdex_id VARCHAR(40) NULL AFTER tcgplayer_id")
         _add_index(conn, db_name, "products", "idx_products_tcgdex",
                    "ALTER TABLE products ADD INDEX idx_products_tcgdex (tcgdex_id)")
+
+        # Multi-utilisateurs Phase A — identités, sessions refresh, jetons email.
+        conn.execute(text(_USERS_DDL))
+        conn.execute(text(_AUTH_SESSIONS_DDL))
+        conn.execute(text(_EMAIL_TOKENS_DDL))

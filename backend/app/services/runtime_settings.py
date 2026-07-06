@@ -88,6 +88,9 @@ RUNTIME_SETTING_DEFAULTS: list[tuple[str, str, str, str]] = [
     ("source_health_fresh_max_age_h", "30", "int", "Âge max (h) d'un snapshot avant 'source muette'"),
     ("source_health_min_volume", "1", "int", "Volume min attendu par run avant 'source cassée'"),
     ("sanity_bounds_eur", '{"etb":[15,400],"display":[60,900],"upc":[40,400],"coffret":[15,400],"booster":[2,60],"bundle":[15,300],"autre":[1,5000]}', "json", "Bornes de sanité prix EUR par product_type (rejet → quarantaine)"),
+    # Multi-utilisateurs Phase A — inscriptions FERMÉES tant que la tenancy (B/C)
+    # n'est pas livrée : un inscrit verrait les données de l'admin.
+    ("signup_enabled", "false", "bool", "Ouvre les inscriptions publiques (laisser false tant que la tenancy n'est pas livrée)"),
 ]
 
 

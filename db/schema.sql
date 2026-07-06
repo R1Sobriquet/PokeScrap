@@ -474,6 +474,54 @@ CREATE TABLE buy_attempts (
     CONSTRAINT fk_buyattempt_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------- Multi-utilisateurs : identités --------------
+CREATE TABLE users (
+    id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    email             VARCHAR(255) NOT NULL,
+    username          VARCHAR(64)  NOT NULL,
+    password_hash     VARCHAR(255) NOT NULL,
+    role              ENUM('admin','user') NOT NULL DEFAULT 'user',
+    plan              ENUM('free','pro')   NOT NULL DEFAULT 'free',
+    status            ENUM('pending','active','disabled') NOT NULL DEFAULT 'pending',
+    email_verified_at DATETIME     NULL,
+    current_tier      SMALLINT     NULL,
+    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_email (email),
+    UNIQUE KEY uq_user_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------- Multi-utilisateurs : sessions refresh ----------
+CREATE TABLE auth_sessions (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT UNSIGNED NOT NULL,
+    refresh_hash CHAR(64)     NOT NULL,
+    expires_at   DATETIME     NOT NULL,
+    revoked_at   DATETIME     NULL,
+    user_agent   VARCHAR(255) NULL,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_session_refresh (refresh_hash),
+    KEY idx_session_user (user_id, expires_at),
+    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------- Multi-utilisateurs : jetons email ------------
+CREATE TABLE email_tokens (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    purpose    ENUM('verify','reset') NOT NULL,
+    token_hash CHAR(64)  NOT NULL,
+    expires_at DATETIME  NOT NULL,
+    used_at    DATETIME  NULL,
+    created_at DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_email_token (token_hash),
+    KEY idx_email_token_user (user_id, purpose),
+    CONSTRAINT fk_email_token_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- --------------------------- PokéStock FR : releases ----------------
 CREATE TABLE releases (
     id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
@@ -710,4 +758,5 @@ INSERT INTO settings (setting_key, setting_value, value_type, description) VALUE
 ('retail_min_delay_ms','3000','int','Délai min (ms) entre deux requêtes vers un même détaillant'),
 ('retail_restock_cooldown_min','360','int','Cooldown (min) avant ré-alerte sur une même offre'),
 ('retail_circuit_max_errors','5','int','Erreurs consécutives avant circuit breaker d''un détaillant'),
-('telegram_enabled','false','bool','Active les notifications Telegram (token/chat_id dans .env)');
+('telegram_enabled','false','bool','Active les notifications Telegram (token/chat_id dans .env)'),
+('signup_enabled','false','bool','Ouvre les inscriptions publiques (laisser false tant que la tenancy n''est pas livrée)');

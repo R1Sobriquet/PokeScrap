@@ -26,11 +26,12 @@ import json
 import logging
 
 import jwt as pyjwt
-from fastapi import APIRouter, HTTPException, Query
+from fastapi import APIRouter, Depends, HTTPException, Query
 from fastapi.responses import StreamingResponse
 from sqlalchemy import func, select
 
-from app.auth import decode_token
+from app.auth import decode_token, get_current_user
+from app.config import get_settings
 from app.models import Alert, RetailStockEvent
 
 logger = logging.getLogger("api.events")
@@ -93,13 +94,34 @@ async def _stream(once: bool):
             elapsed = 0.0
 
 
+@router.get("/events/ticket")
+def events_ticket(user=Depends(get_current_user)) -> dict:
+    """Ticket SSE éphémère (60 s, usage unique de facto).
+
+    ``EventSource`` ne pose pas d'en-têtes : plutôt que d'exposer l'access token
+    complet dans l'URL (logs, historiques), le front échange son Bearer contre ce
+    ticket court à portée limitée (``purpose=sse``) juste avant d'ouvrir le flux.
+    """
+    settings = get_settings()
+    now = dt.datetime.now(dt.timezone.utc)
+    ticket = pyjwt.encode(
+        {"sub": str(user.id), "purpose": "sse", "iat": now,
+         "exp": now + dt.timedelta(seconds=60)},
+        settings.jwt_secret, algorithm="HS256",
+    )
+    return {"ticket": ticket}
+
+
 @router.get("/events/stream")
 async def events_stream(token: str = Query(...), once: bool = Query(False)) -> StreamingResponse:
-    """Flux SSE authentifié (JWT en query — EventSource ne pose pas d'en-têtes)."""
+    """Flux SSE authentifié par ticket court (ou access token legacy en transition)."""
     try:
-        decode_token(token)
+        payload = decode_token(token)
     except pyjwt.PyJWTError as exc:
         raise HTTPException(status_code=401, detail="Token invalide") from exc
+    purpose = payload.get("purpose")
+    if purpose is not None and purpose != "sse":
+        raise HTTPException(status_code=401, detail="Jeton inadapté au flux")
     return StreamingResponse(
         _stream(once),
         media_type="text/event-stream",

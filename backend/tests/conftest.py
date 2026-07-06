@@ -8,6 +8,13 @@ la vraie logique (ingestion, lecture, auth, get_setting) sans conteneur.
 
 from __future__ import annotations
 
+import os
+
+# AVANT tout import applicatif : pydantic Settings est un singleton lru_cache
+# lu au premier import — le rate limiting doit être coupé pour toute la suite
+# (les tests enchaînent les logins ; le limiter se teste unitairement).
+os.environ.setdefault("RATE_LIMIT_ENABLED", "false")
+
 import pytest
 from sqlalchemy import create_engine
 from sqlalchemy.orm import sessionmaker
