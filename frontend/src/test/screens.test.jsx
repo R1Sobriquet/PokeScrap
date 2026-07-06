@@ -13,10 +13,18 @@ vi.mock("../hooks/usePolling.js", () => ({
 }));
 
 vi.mock("../api.js", () => ({
-  api: { get: vi.fn(), put: h.put, post: h.post },
+  api: { get: vi.fn(() => Promise.resolve({})), put: h.put, post: h.post },
   exportUrl: (p) => p,
   login: vi.fn(),
-  fetchMe: vi.fn(),
+  fetchMe: vi.fn(() => Promise.resolve({ username: "erwann", role: "admin", plan: "pro" })),
+  // Auth v2 : silent refresh au boot (null = pas de session) + liaisons.
+  refreshSession: vi.fn(() => Promise.resolve(null)),
+  logoutSession: vi.fn(),
+  bindSession: vi.fn(),
+  registerAccount: h.register ?? vi.fn(() => Promise.resolve({})),
+  verifyEmail: vi.fn(() => Promise.resolve({})),
+  forgotPassword: vi.fn(() => Promise.resolve({})),
+  resetPassword: vi.fn(() => Promise.resolve({})),
 }));
 
 import { MemoryRouter } from "react-router-dom";
@@ -117,14 +125,31 @@ describe("Layout — shell", () => {
     expect(screen.getByLabelText("Rejouer le tutoriel")).toBeInTheDocument();
     expect(screen.getByLabelText("Ouvrir la navigation")).toBeInTheDocument(); // hamburger mobile
   });
+
+  it("masque la nav d'exploitation aux non-admins", () => {
+    h.polled["/alerts?status=pending"] = [];
+    wrap(<Layout />); // AuthProvider sans profil → rôle "user"
+    expect(screen.queryByText("Actions & Jobs")).not.toBeInTheDocument();
+    expect(screen.queryByText("Détaillants")).not.toBeInTheDocument();
+    expect(screen.getByText("Watchlist")).toBeInTheDocument(); // nav user intacte
+  });
 });
 
 describe("Auth", () => {
-  it("protège les routes : non connecté → écran de login", () => {
-    // "/" est la landing publique ; une route protégée redirige vers le login.
+  it("protège les routes : non connecté → écran de login", async () => {
+    // "/" est la landing publique ; une route protégée redirige vers le login
+    // (après le silent refresh du boot, résolu à null par le mock).
     window.history.pushState({}, "", "/cockpit");
     render(<App />);
-    expect(screen.getByText("Se connecter")).toBeInTheDocument();
+    expect(await screen.findByText("Se connecter")).toBeInTheDocument();
+    window.history.pushState({}, "", "/");
+  });
+
+  it("inscription : formulaire complet + lien retour connexion", () => {
+    window.history.pushState({}, "", "/register");
+    render(<App />);
+    expect(screen.getByText("Créer mon compte")).toBeInTheDocument();
+    expect(screen.getByText("Email")).toBeInTheDocument();
     window.history.pushState({}, "", "/");
   });
 });

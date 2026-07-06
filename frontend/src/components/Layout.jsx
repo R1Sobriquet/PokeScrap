@@ -130,7 +130,7 @@ const NAV_GROUPS = [
     items: [
       { to: "/restock", key: "nav.restock" },
       { to: "/flip", key: "nav.flip" },
-      { to: "/detaillants", key: "nav.detaillants" },
+      { to: "/detaillants", key: "nav.detaillants", adminOnly: true },
       { to: "/magasins", key: "nav.magasins" },
       { to: "/achat-assiste", key: "nav.buyrules" },
       { to: "/calendrier", key: "nav.calendrier" },
@@ -148,8 +148,8 @@ const NAV_GROUPS = [
   {
     section: "nav.section.ops",
     items: [
-      { to: "/jobs", key: "nav.jobs" },
-      { to: "/reglages", key: "nav.reglages" },
+      { to: "/jobs", key: "nav.jobs", adminOnly: true },
+      { to: "/reglages", key: "nav.reglages", adminOnly: true },
     ],
   },
 ];
@@ -163,10 +163,16 @@ const THEME_SWATCH = {
 };
 
 // Corps de navigation partagé entre la sidebar desktop et le tiroir mobile.
-function SidebarNav({ t, onNavigate }) {
+function SidebarNav({ t, onNavigate, isAdmin = false }) {
+  // Les entrées d'exploitation (jobs, détaillants, réglages globaux) sont
+  // réservées au rôle admin — le backend les gate aussi (require_admin).
+  const groups = NAV_GROUPS.map((g) => ({
+    ...g,
+    items: g.items.filter((n) => !n.adminOnly || isAdmin),
+  })).filter((g) => g.items.length > 0);
   return (
     <nav className="flex flex-col gap-4" aria-label={t("nav.section.market")}>
-      {NAV_GROUPS.map((group) => (
+      {groups.map((group) => (
         <div key={group.section} className="flex flex-col gap-1">
           <div className="px-3 pb-1 font-mono text-[10px] uppercase tracking-[0.14em] text-slate-500">
             {t(group.section)}
@@ -277,7 +283,8 @@ function LangSwitcher() {
 }
 
 export default function Layout() {
-  const { username, signOut } = useAuth();
+  const { username, role, signOut } = useAuth();
+  const isAdmin = role === "admin";
   const { t, setLang } = useI18n();
   const { setTheme } = useTheme();
   const navigate = useNavigate();
@@ -292,10 +299,12 @@ export default function Layout() {
     setTimeout(() => startTour(t), 500);
   };
 
-  // Construit la liste de commandes ⌘K : navigation + actions.
+  // Construit la liste de commandes ⌘K : navigation + actions (filtrées par rôle).
   const commands = [
     ...NAV_GROUPS.flatMap((g) =>
-      g.items.map((n) => ({ id: `nav:${n.to}`, label: t(n.key), hint: t(g.section), run: () => navigate(n.to) }))
+      g.items
+        .filter((n) => !n.adminOnly || isAdmin)
+        .map((n) => ({ id: `nav:${n.to}`, label: t(n.key), hint: t(g.section), run: () => navigate(n.to) }))
     ),
     { id: "act:pack", label: `✦ ${t("pack.cta")}`, hint: t("palette.action"), run: () => setPackOpen(true) },
     { id: "act:tour", label: `🎓 ${t("tour.replay")}`, hint: t("palette.action"), run: replayTour },
@@ -373,7 +382,7 @@ export default function Layout() {
           className="hidden w-56 shrink-0 p-3 md:block"
           style={{ borderRight: "1px solid var(--line)", background: "var(--panel)" }}
         >
-          <SidebarNav t={t} />
+          <SidebarNav t={t} isAdmin={isAdmin} />
         </aside>
 
         {/* Tiroir de navigation mobile (le sidebar est masqué < md) */}
@@ -389,7 +398,7 @@ export default function Layout() {
                         className="h-8 w-8 rounded-lg text-slate-400"
                         style={{ border: "1px solid var(--border2)" }}>✕</button>
               </div>
-              <SidebarNav t={t} onNavigate={() => setNavOpen(false)} />
+              <SidebarNav t={t} isAdmin={isAdmin} onNavigate={() => setNavOpen(false)} />
             </div>
           </div>
         )}

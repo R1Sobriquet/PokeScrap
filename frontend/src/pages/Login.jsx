@@ -1,6 +1,6 @@
 import { useState } from "react";
-import { useNavigate } from "react-router-dom";
-import { login } from "../api.js";
+import { Link, useNavigate } from "react-router-dom";
+import { fetchMe, login } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { useI18n } from "../i18n.jsx";
 
@@ -19,7 +19,13 @@ export default function Login() {
     setLoading(true);
     try {
       const { access_token } = await login(username, password);
-      signIn(access_token, username);
+      let profile = { username };
+      try {
+        profile = await fetchMe(access_token); // rôle + plan pour le chrome
+      } catch {
+        /* best-effort : la session marche sans le profil */
+      }
+      signIn(access_token, profile);
       navigate("/cockpit", { replace: true });
     } catch (err) {
       setError(err.message);
@@ -98,6 +104,14 @@ export default function Login() {
           >
             {loading ? t("login.submitting") : t("login.submit")}
           </button>
+          <div className="flex items-center justify-between text-xs">
+            <Link to="/register" className="font-semibold" style={{ color: "var(--blue-soft)" }}>
+              {t("auth.register.cta")}
+            </Link>
+            <Link to="/forgot" className="text-slate-500 hover:text-slate-300">
+              {t("auth.forgot.cta")}
+            </Link>
+          </div>
         </form>
       </div>
     </div>

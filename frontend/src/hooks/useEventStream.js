@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { api } from "../api.js";
 import { useAuth } from "../AuthContext.jsx";
 import { revalidatePath } from "./usePolling.js";
 
@@ -10,8 +11,9 @@ const API_URL = import.meta.env.VITE_API_URL || "http://localhost:8000";
 // existant reste en place comme filet de sécurité : si le flux tombe, rien ne
 // casse, on retente avec backoff exponentiel (cap 30 s).
 //
-// Le JWT passe en query string (EventSource ne pose pas d'en-têtes) — app
-// mono-utilisateur locale/Tailscale, jamais exposée publiquement.
+// EventSource ne pose pas d'en-têtes : on échange le Bearer contre un TICKET
+// court (60 s, portée sse) juste avant chaque (re)connexion — l'access token
+// complet n'apparaît jamais dans une URL.
 export function useEventStream() {
   const { token } = useAuth();
 
@@ -31,9 +33,26 @@ export function useEventStream() {
       }
     };
 
-    const open = () => {
+    const scheduleRetry = () => {
       if (closed) return;
-      es = new EventSource(`${API_URL}/events/stream?token=${encodeURIComponent(token)}`);
+      timer = setTimeout(open, retry);
+      retry = Math.min(retry * 2, 30000);
+    };
+
+    const open = async () => {
+      if (closed) return;
+      let ticket = null;
+      try {
+        ticket = (await api.get(token, "/events/ticket"))?.ticket;
+      } catch {
+        /* backend indisponible : on retentera */
+      }
+      if (!ticket) {
+        scheduleRetry();
+        return;
+      }
+      if (closed) return;
+      es = new EventSource(`${API_URL}/events/stream?token=${encodeURIComponent(ticket)}`);
       es.addEventListener("alerts", onPush);
       es.addEventListener("offers", onPush);
       es.onopen = () => {
@@ -41,10 +60,7 @@ export function useEventStream() {
       };
       es.onerror = () => {
         es.close();
-        if (!closed) {
-          timer = setTimeout(open, retry);
-          retry = Math.min(retry * 2, 30000);
-        }
+        scheduleRetry();
       };
     };
 

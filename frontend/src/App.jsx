@@ -11,6 +11,10 @@ import Layout from "./components/Layout.jsx";
 // code-splitting par route (le shell charge sans recharts ni pages).
 import Landing from "./pages/Landing.jsx";
 import Login from "./pages/Login.jsx";
+import Register from "./pages/Register.jsx";
+import Verify from "./pages/Verify.jsx";
+import Forgot from "./pages/Forgot.jsx";
+import ResetPassword from "./pages/ResetPassword.jsx";
 
 const Cockpit = lazy(() => import("./pages/Cockpit.jsx"));
 const Opportunities = lazy(() => import("./pages/Opportunities.jsx"));
@@ -43,6 +47,10 @@ export default function App() {
         <Routes>
           <Route path="/" element={<Landing />} />
           <Route path="/login" element={<Login />} />
+          <Route path="/register" element={<Register />} />
+          <Route path="/verify" element={<Verify />} />
+          <Route path="/forgot" element={<Forgot />} />
+          <Route path="/reset" element={<ResetPassword />} />
           <Route
             element={
               <ProtectedRoute>
