@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, Integer, Numeric, SmallInteger, String, Text, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, BigIntPK
@@ -13,10 +13,18 @@ from app.db import Base, BigIntPK
 
 class Watchlist(Base):
     __tablename__ = "watchlist"
+    # Unicité PAR USER (l'ancienne unicité globale product_id interdisait à deux
+    # utilisateurs de suivre la même carte).
+    __table_args__ = (UniqueConstraint("user_id", "product_id", name="uq_watch_user_product"),)
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    #: Propriétaire (multi-user Phase B). Nullable tant que la Phase C n'a pas
+    #: threadé user_id dans les services ; re-backfillé puis NOT NULL ensuite.
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
     product_id: Mapped[int] = mapped_column(
-        BigInteger, ForeignKey("products.id", ondelete="CASCADE"), unique=True, nullable=False
+        BigInteger, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
     )
     tier: Mapped[str] = mapped_column(String(8), nullable=False, default="B")
     is_trinity: Mapped[int] = mapped_column(SmallInteger, nullable=False, default=0)

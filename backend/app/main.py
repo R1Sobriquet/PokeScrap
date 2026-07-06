@@ -21,7 +21,7 @@ from app.config import get_settings
 from app.db import SessionLocal, check_db, engine
 from app.logging_config import setup_logging
 from app.services.runtime_settings import ensure_runtime_settings
-from app.services.schema_migrations import ensure_schema_upgrades
+from app.services.schema_migrations import backfill_multiuser, ensure_schema_upgrades
 from app.services.tracked_sets import ensure_default_tracked_sets
 
 setup_logging()  # logs JSON + redaction des secrets
@@ -74,6 +74,7 @@ async def lifespan(app: FastAPI):
         ensure_runtime_settings(db)
         ensure_default_tracked_sets(db)
         ensure_admin_user(db)  # migre l'admin .env vers la table users (idempotent)
+        backfill_multiuser(db)  # rattache à l'admin les lignes encore orphelines
     logger.info("Backend prêt.")
     yield
     logger.info("Arrêt backend.")

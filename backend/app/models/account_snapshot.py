@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Numeric, func
+from sqlalchemy import BigInteger, Date, DateTime, ForeignKey, Numeric, UniqueConstraint, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, BigIntPK
@@ -13,9 +13,16 @@ from app.db import Base, BigIntPK
 
 class AccountSnapshot(Base):
     __tablename__ = "account_snapshots"
+    # Un snapshot par jour ET PAR USER (l'unicité globale par date est morte).
+    __table_args__ = (UniqueConstraint("user_id", "snapshot_date", name="uq_snapshot_user_date"),)
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
-    snapshot_date: Mapped[dt.date] = mapped_column(Date, unique=True, nullable=False)
+    #: Propriétaire (multi-user Phase B). Nullable tant que la Phase C n'a pas
+    #: threadé user_id dans les services ; re-backfillé puis NOT NULL ensuite.
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
+    snapshot_date: Mapped[dt.date] = mapped_column(Date, nullable=False)
     total_portfolio_value: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     capital_invested: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)
     cash_available: Mapped[Decimal] = mapped_column(Numeric(12, 2), nullable=False)

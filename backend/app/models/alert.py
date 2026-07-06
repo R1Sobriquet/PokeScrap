@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import datetime as dt
 
-from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, String, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, JSON, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, BigIntPK
@@ -20,6 +20,11 @@ class Alert(Base):
     __tablename__ = "alerts"
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    #: Propriétaire (multi-user Phase B). Nullable tant que la Phase C n'a pas
+    #: threadé user_id dans les services ; re-backfillé puis NOT NULL ensuite.
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
     alert_type: Mapped[str] = mapped_column(String(32), nullable=False)
     severity: Mapped[str] = mapped_column(String(16), nullable=False, default="info")
     product_id: Mapped[int | None] = mapped_column(

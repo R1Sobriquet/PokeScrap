@@ -39,6 +39,8 @@ from app.models.popularity_tier import PopularityTier
 from app.models.tracked_set import TrackedSet
 from app.models.transaction import Transaction
 from app.models.user import User
+from app.models.user_setting import UserSetting
+from app.models.user_watch import UserListingStatus, UserWatchedOffer, UserWatchedStore
 from app.models.watchlist import Watchlist
 
 __all__ = [
@@ -77,5 +79,9 @@ __all__ = [
     "TrackedSet",
     "Transaction",
     "User",
+    "UserListingStatus",
+    "UserSetting",
+    "UserWatchedOffer",
+    "UserWatchedStore",
     "Watchlist",
 ]

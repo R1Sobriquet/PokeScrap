@@ -5,7 +5,7 @@ from __future__ import annotations
 import datetime as dt
 from decimal import Decimal
 
-from sqlalchemy import JSON, BigInteger, DateTime, ForeignKey, Numeric, SmallInteger, func
+from sqlalchemy import BigInteger, DateTime, ForeignKey, JSON, Numeric, SmallInteger, func
 from sqlalchemy.orm import Mapped, mapped_column
 
 from app.db import Base, BigIntPK
@@ -15,6 +15,11 @@ class GradingOpportunity(Base):
     __tablename__ = "grading_opportunities"
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    #: Propriétaire (multi-user Phase B). Nullable tant que la Phase C n'a pas
+    #: threadé user_id dans les services ; re-backfillé puis NOT NULL ensuite.
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
     product_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("products.id", ondelete="CASCADE"), nullable=False
     )

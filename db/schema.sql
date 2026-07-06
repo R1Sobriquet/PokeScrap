@@ -93,9 +93,58 @@ CREATE TABLE price_snapshots (
     CONSTRAINT fk_snap_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
+-- ---------------------- Multi-utilisateurs : identités --------------
+CREATE TABLE users (
+    id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    email             VARCHAR(255) NOT NULL,
+    username          VARCHAR(64)  NOT NULL,
+    password_hash     VARCHAR(255) NOT NULL,
+    role              ENUM('admin','user') NOT NULL DEFAULT 'user',
+    plan              ENUM('free','pro')   NOT NULL DEFAULT 'free',
+    status            ENUM('pending','active','disabled') NOT NULL DEFAULT 'pending',
+    email_verified_at DATETIME     NULL,
+    current_tier      SMALLINT     NULL,
+    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_email (email),
+    UNIQUE KEY uq_user_username (username)
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- ------------------- Multi-utilisateurs : sessions refresh ----------
+CREATE TABLE auth_sessions (
+    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id      BIGINT UNSIGNED NOT NULL,
+    refresh_hash CHAR(64)     NOT NULL,
+    expires_at   DATETIME     NOT NULL,
+    revoked_at   DATETIME     NULL,
+    user_agent   VARCHAR(255) NULL,
+    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_session_refresh (refresh_hash),
+    KEY idx_session_user (user_id, expires_at),
+    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+-- --------------------- Multi-utilisateurs : jetons email ------------
+CREATE TABLE email_tokens (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    purpose    ENUM('verify','reset') NOT NULL,
+    token_hash CHAR(64)  NOT NULL,
+    expires_at DATETIME  NOT NULL,
+    used_at    DATETIME  NULL,
+    created_at DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_email_token (token_hash),
+    KEY idx_email_token_user (user_id, purpose),
+    CONSTRAINT fk_email_token_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
 -- ----------------------------- 5. watchlist -------------------------
 CREATE TABLE watchlist (
     id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     product_id           BIGINT UNSIGNED NOT NULL,
     tier                 ENUM('S++','S','A','B','C') NOT NULL DEFAULT 'B',
     is_trinity           TINYINT(1)   NOT NULL DEFAULT 0,
@@ -110,7 +159,9 @@ CREATE TABLE watchlist (
     created_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_watch_product (product_id),
+    KEY idx_watchlist_user (user_id),
+    CONSTRAINT fk_watchlist_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    UNIQUE KEY uq_watch_user_product (user_id, product_id),
     KEY idx_tier (tier),
     KEY idx_trinity (is_trinity),
     CONSTRAINT fk_watch_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
@@ -119,6 +170,7 @@ CREATE TABLE watchlist (
 -- --------------------------- tracked_sets (auto-watchlist) ----------
 CREATE TABLE tracked_sets (
     id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     set_slug        VARCHAR(128) NOT NULL,
     name            VARCHAR(255) NOT NULL,
     is_active       TINYINT(1)   NOT NULL DEFAULT 1,
@@ -129,7 +181,9 @@ CREATE TABLE tracked_sets (
     created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_tracked_set_slug (set_slug)
+    KEY idx_tracked_sets_user (user_id),
+    CONSTRAINT fk_tracked_sets_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    UNIQUE KEY uq_tracked_user_slug (user_id, set_slug)
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------- job_runs (jobs à la demande) -----------
@@ -184,6 +238,7 @@ CREATE TABLE sourcing_listings (
 -- ----------------------------- 7. lots ------------------------------
 CREATE TABLE lots (
     id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     source_listing_id BIGINT UNSIGNED NULL,
     label             VARCHAR(255) NULL,
     total_cost        DECIMAL(12,2) NOT NULL,
@@ -195,6 +250,8 @@ CREATE TABLE lots (
     created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_lots_user (user_id),
+    CONSTRAINT fk_lots_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     KEY idx_lot_status (status),
     CONSTRAINT fk_lot_listing FOREIGN KEY (source_listing_id) REFERENCES sourcing_listings (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -202,6 +259,7 @@ CREATE TABLE lots (
 -- ----------------------------- 8. lot_items -------------------------
 CREATE TABLE lot_items (
     id                   BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     lot_id               BIGINT UNSIGNED NOT NULL,
     product_id           BIGINT UNSIGNED NULL,
     quantity             INT UNSIGNED NOT NULL DEFAULT 1,
@@ -213,6 +271,8 @@ CREATE TABLE lot_items (
     created_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at           DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_lot_items_user (user_id),
+    CONSTRAINT fk_lot_items_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     KEY idx_lot (lot_id),
     KEY idx_item_status (status),
     CONSTRAINT fk_item_lot FOREIGN KEY (lot_id) REFERENCES lots (id) ON DELETE CASCADE,
@@ -222,6 +282,7 @@ CREATE TABLE lot_items (
 -- ----------------------------- 9. positions -------------------------
 CREATE TABLE positions (
     id                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     product_id             BIGINT UNSIGNED NOT NULL,
     lot_id                 BIGINT UNSIGNED NULL,
     quantity               INT UNSIGNED NOT NULL DEFAULT 1,
@@ -239,6 +300,8 @@ CREATE TABLE positions (
     created_at             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_positions_user (user_id),
+    CONSTRAINT fk_positions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     KEY idx_pos_product (product_id),
     KEY idx_pos_status (status),
     CONSTRAINT fk_pos_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE RESTRICT,
@@ -248,6 +311,7 @@ CREATE TABLE positions (
 -- ----------------------------- 10. transactions --------------------
 CREATE TABLE transactions (
     id              BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     tx_type         ENUM('buy','sell','fee','adjustment') NOT NULL,
     product_id      BIGINT UNSIGNED NULL,
     position_id     BIGINT UNSIGNED NULL,
@@ -264,6 +328,8 @@ CREATE TABLE transactions (
     notes           TEXT         NULL,
     created_at      DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_transactions_user (user_id),
+    CONSTRAINT fk_transactions_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     KEY idx_tx_type_time (tx_type, occurred_at),
     KEY idx_tx_product (product_id),
     CONSTRAINT fk_tx_product  FOREIGN KEY (product_id)  REFERENCES products (id)  ON DELETE SET NULL,
@@ -274,6 +340,7 @@ CREATE TABLE transactions (
 -- ----------------------------- 11. account_snapshots ---------------
 CREATE TABLE account_snapshots (
     id                     BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     snapshot_date          DATE          NOT NULL,
     total_portfolio_value  DECIMAL(12,2) NOT NULL,
     capital_invested       DECIMAL(12,2) NOT NULL,
@@ -287,7 +354,9 @@ CREATE TABLE account_snapshots (
     tax_provision          DECIMAL(12,2) NULL,
     created_at             DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_snapshot_date (snapshot_date),
+    KEY idx_account_snapshots_user (user_id),
+    CONSTRAINT fk_account_snapshots_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
+    UNIQUE KEY uq_snapshot_user_date (user_id, snapshot_date),
     CONSTRAINT fk_snap_tier FOREIGN KEY (current_tier_id) REFERENCES tiers_config (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
@@ -312,6 +381,7 @@ CREATE TABLE psa_certs (
 -- ----------------------------- 13. grading_opportunities -----------
 CREATE TABLE grading_opportunities (
     id                    BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     product_id            BIGINT UNSIGNED NOT NULL,
     raw_value             DECIMAL(12,2) NULL,
     psa9_value            DECIMAL(12,2) NULL,
@@ -326,6 +396,8 @@ CREATE TABLE grading_opportunities (
     computed_at           DATETIME     NOT NULL,
     created_at            DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_grading_opportunities_user (user_id),
+    CONSTRAINT fk_grading_opportunities_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     KEY idx_grad_product (product_id),
     KEY idx_grad_reco (is_recommended),
     CONSTRAINT fk_grad_product FOREIGN KEY (product_id) REFERENCES products (id) ON DELETE CASCADE
@@ -334,6 +406,7 @@ CREATE TABLE grading_opportunities (
 -- ----------------------------- 14. alerts ---------------------------
 CREATE TABLE alerts (
     id                  BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     alert_type          ENUM('buy','sell_x2','sell_25_50_25','sell_forced','sell_reminder',
                              'cash_min','anti_pump','anti_fomo','illiquid','grading','reinvest',
                              'tax_provision','palier_up','palier_down','auction_reminder',
@@ -348,6 +421,8 @@ CREATE TABLE alerts (
     sent_to_discord_at  DATETIME     NULL,
     created_at          DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_alerts_user (user_id),
+    CONSTRAINT fk_alerts_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     KEY idx_alert_status (status),
     KEY idx_alert_type_time (alert_type, created_at),
     CONSTRAINT fk_alert_product  FOREIGN KEY (product_id)          REFERENCES products (id)          ON DELETE SET NULL,
@@ -448,6 +523,7 @@ CREATE TABLE offer_store_availability (
 -- ------------------------ PokéStock FR Phase C : buy_rules ----------
 CREATE TABLE buy_rules (
     id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id              BIGINT UNSIGNED NULL,
     scope        ENUM('offer','product_type') NOT NULL,
     scope_value  VARCHAR(64)  NOT NULL,
     retailer_id  BIGINT UNSIGNED NULL,
@@ -456,6 +532,8 @@ CREATE TABLE buy_rules (
     is_enabled   TINYINT(1)   NOT NULL DEFAULT 0,
     created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
+    KEY idx_buy_rules_user (user_id),
+    CONSTRAINT fk_buy_rules_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE,
     KEY idx_buy_rule_scope (scope, scope_value),
     CONSTRAINT fk_buyrule_retailer FOREIGN KEY (retailer_id) REFERENCES retailers (id) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
@@ -474,52 +552,55 @@ CREATE TABLE buy_attempts (
     CONSTRAINT fk_buyattempt_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ---------------------- Multi-utilisateurs : identités --------------
-CREATE TABLE users (
-    id                BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    email             VARCHAR(255) NOT NULL,
-    username          VARCHAR(64)  NOT NULL,
-    password_hash     VARCHAR(255) NOT NULL,
-    role              ENUM('admin','user') NOT NULL DEFAULT 'user',
-    plan              ENUM('free','pro')   NOT NULL DEFAULT 'free',
-    status            ENUM('pending','active','disabled') NOT NULL DEFAULT 'pending',
-    email_verified_at DATETIME     NULL,
-    current_tier      SMALLINT     NULL,
-    created_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    updated_at        DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+-- ------------------ Multi-utilisateurs : préférences ----------------
+CREATE TABLE user_settings (
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id       BIGINT UNSIGNED NOT NULL,
+    setting_key   VARCHAR(64) NOT NULL,
+    setting_value TEXT        NULL,
+    value_type    VARCHAR(16) NOT NULL DEFAULT 'string',
+    updated_at    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_user_email (email),
-    UNIQUE KEY uq_user_username (username)
+    UNIQUE KEY uq_user_setting (user_id, setting_key),
+    CONSTRAINT fk_usersetting_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
--- ------------------- Multi-utilisateurs : sessions refresh ----------
-CREATE TABLE auth_sessions (
-    id           BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
-    user_id      BIGINT UNSIGNED NOT NULL,
-    refresh_hash CHAR(64)     NOT NULL,
-    expires_at   DATETIME     NOT NULL,
-    revoked_at   DATETIME     NULL,
-    user_agent   VARCHAR(255) NULL,
-    created_at   DATETIME     NOT NULL DEFAULT CURRENT_TIMESTAMP,
-    PRIMARY KEY (id),
-    UNIQUE KEY uq_session_refresh (refresh_hash),
-    KEY idx_session_user (user_id, expires_at),
-    CONSTRAINT fk_session_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
-) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
-
--- --------------------- Multi-utilisateurs : jetons email ------------
-CREATE TABLE email_tokens (
+-- ------------- Multi-utilisateurs : intentions de veille -------------
+CREATE TABLE user_watched_offers (
     id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
     user_id    BIGINT UNSIGNED NOT NULL,
-    purpose    ENUM('verify','reset') NOT NULL,
-    token_hash CHAR(64)  NOT NULL,
-    expires_at DATETIME  NOT NULL,
-    used_at    DATETIME  NULL,
-    created_at DATETIME  NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    offer_id   BIGINT UNSIGNED NOT NULL,
+    watch_tier VARCHAR(8)  NOT NULL DEFAULT 'normal',
+    created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
     PRIMARY KEY (id),
-    UNIQUE KEY uq_email_token (token_hash),
-    KEY idx_email_token_user (user_id, purpose),
-    CONSTRAINT fk_email_token_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+    UNIQUE KEY uq_user_watched_offer (user_id, offer_id),
+    KEY idx_uwo_offer (offer_id),
+    CONSTRAINT fk_uwo_user  FOREIGN KEY (user_id)  REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_uwo_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_watched_stores (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    store_id   BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_watched_store (user_id, store_id),
+    CONSTRAINT fk_uws_user  FOREIGN KEY (user_id)  REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_uws_store FOREIGN KEY (store_id) REFERENCES store_locations (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+
+CREATE TABLE user_listing_status (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    listing_id BIGINT UNSIGNED NOT NULL,
+    status     VARCHAR(16) NOT NULL DEFAULT 'new',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_listing (user_id, listing_id),
+    CONSTRAINT fk_uls_user    FOREIGN KEY (user_id)    REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_uls_listing FOREIGN KEY (listing_id) REFERENCES sourcing_listings (id) ON DELETE CASCADE
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 
 -- --------------------------- PokéStock FR : releases ----------------

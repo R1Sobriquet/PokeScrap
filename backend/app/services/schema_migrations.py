@@ -346,6 +346,75 @@ CREATE TABLE IF NOT EXISTS email_tokens (
 """
 
 
+# ---------------------------------------------------------------------------
+#  Multi-utilisateurs (Phase B) — tenancy : overlays per-user des données.
+# ---------------------------------------------------------------------------
+
+_USER_SETTINGS_DDL = """
+CREATE TABLE IF NOT EXISTS user_settings (
+    id            BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id       BIGINT UNSIGNED NOT NULL,
+    setting_key   VARCHAR(64) NOT NULL,
+    setting_value TEXT        NULL,
+    value_type    VARCHAR(16) NOT NULL DEFAULT 'string',
+    updated_at    DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_setting (user_id, setting_key),
+    CONSTRAINT fk_usersetting_user FOREIGN KEY (user_id) REFERENCES users (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_USER_WATCHED_OFFERS_DDL = """
+CREATE TABLE IF NOT EXISTS user_watched_offers (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    offer_id   BIGINT UNSIGNED NOT NULL,
+    watch_tier VARCHAR(8)  NOT NULL DEFAULT 'normal',
+    created_at DATETIME    NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_watched_offer (user_id, offer_id),
+    KEY idx_uwo_offer (offer_id),
+    CONSTRAINT fk_uwo_user  FOREIGN KEY (user_id)  REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_uwo_offer FOREIGN KEY (offer_id) REFERENCES retail_offers (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_USER_WATCHED_STORES_DDL = """
+CREATE TABLE IF NOT EXISTS user_watched_stores (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    store_id   BIGINT UNSIGNED NOT NULL,
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_watched_store (user_id, store_id),
+    CONSTRAINT fk_uws_user  FOREIGN KEY (user_id)  REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_uws_store FOREIGN KEY (store_id) REFERENCES store_locations (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+_USER_LISTING_STATUS_DDL = """
+CREATE TABLE IF NOT EXISTS user_listing_status (
+    id         BIGINT UNSIGNED NOT NULL AUTO_INCREMENT,
+    user_id    BIGINT UNSIGNED NOT NULL,
+    listing_id BIGINT UNSIGNED NOT NULL,
+    status     VARCHAR(16) NOT NULL DEFAULT 'new',
+    created_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP,
+    PRIMARY KEY (id),
+    UNIQUE KEY uq_user_listing (user_id, listing_id),
+    CONSTRAINT fk_uls_user    FOREIGN KEY (user_id)    REFERENCES users (id) ON DELETE CASCADE,
+    CONSTRAINT fk_uls_listing FOREIGN KEY (listing_id) REFERENCES sourcing_listings (id) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci
+"""
+
+#: Tables user-owned qui reçoivent la colonne ``user_id`` (nullable en Phase B :
+#: les services ne la peuplent qu'en Phase C ; re-backfill puis NOT NULL ensuite).
+_TENANCY_TABLES = (
+    "positions", "transactions", "lots", "lot_items", "account_snapshots",
+    "alerts", "grading_opportunities", "buy_rules", "watchlist", "tracked_sets",
+)
+
+
 def _add_col(conn, db_name: str, table: str, column: str, ddl: str) -> None:
     """ALTER ADD COLUMN gardé par information_schema (idempotent)."""
     exists = conn.execute(text(
@@ -366,6 +435,17 @@ def _add_index(conn, db_name: str, table: str, index: str, ddl: str) -> None:
     if not exists:
         conn.execute(text(ddl))
         logger.info("Migration : index %s.%s ajouté.", table, index)
+
+
+def _drop_index(conn, db_name: str, table: str, index: str) -> None:
+    """ALTER DROP INDEX gardé par information_schema (idempotent)."""
+    exists = conn.execute(text(
+        "SELECT COUNT(*) FROM information_schema.statistics WHERE table_schema = :db "
+        "AND table_name = :t AND index_name = :i"
+    ), {"db": db_name, "t": table, "i": index}).scalar()
+    if exists:
+        conn.execute(text(f"ALTER TABLE {table} DROP INDEX {index}"))
+        logger.info("Migration : index %s.%s supprimé.", table, index)
 
 
 _STORE_LOCATIONS_DDL = """
@@ -583,3 +663,76 @@ def ensure_schema_upgrades(engine: Engine) -> None:
         conn.execute(text(_USERS_DDL))
         conn.execute(text(_AUTH_SESSIONS_DDL))
         conn.execute(text(_EMAIL_TOKENS_DDL))
+
+        # Multi-utilisateurs Phase B — tenancy : user_id sur les tables
+        # user-owned (nullable, backfillé au boot par backfill_multiuser),
+        # swaps d'unicité globale → par user, overlays de veille per-user.
+        for table in _TENANCY_TABLES:
+            _add_col(conn, db_name, table, "user_id",
+                     f"ALTER TABLE {table} ADD COLUMN user_id BIGINT UNSIGNED NULL")
+            _add_index(conn, db_name, table, f"idx_{table}_user",
+                       f"ALTER TABLE {table} ADD INDEX idx_{table}_user (user_id)")
+        # watchlist : UNIQUE(product_id) → UNIQUE(user_id, product_id)
+        _add_index(conn, db_name, "watchlist", "uq_watch_user_product",
+                   "ALTER TABLE watchlist ADD UNIQUE uq_watch_user_product (user_id, product_id)")
+        _drop_index(conn, db_name, "watchlist", "uq_watch_product")
+        # account_snapshots : UNIQUE(snapshot_date) → UNIQUE(user_id, snapshot_date)
+        _add_index(conn, db_name, "account_snapshots", "uq_snapshot_user_date",
+                   "ALTER TABLE account_snapshots ADD UNIQUE uq_snapshot_user_date (user_id, snapshot_date)")
+        _drop_index(conn, db_name, "account_snapshots", "uq_snapshot_date")
+        # tracked_sets : UNIQUE(set_slug) → UNIQUE(user_id, set_slug)
+        _add_index(conn, db_name, "tracked_sets", "uq_tracked_user_slug",
+                   "ALTER TABLE tracked_sets ADD UNIQUE uq_tracked_user_slug (user_id, set_slug)")
+        _drop_index(conn, db_name, "tracked_sets", "uq_tracked_set_slug")
+        conn.execute(text(_USER_SETTINGS_DDL))
+        conn.execute(text(_USER_WATCHED_OFFERS_DDL))
+        conn.execute(text(_USER_WATCHED_STORES_DDL))
+        conn.execute(text(_USER_LISTING_STATUS_DDL))
+
+
+def backfill_multiuser(db) -> int:
+    """Rattache à l'admin les lignes user-owned encore orphelines (idempotent).
+
+    Appelé au boot APRÈS ``ensure_admin_user`` (l'admin doit exister). Couvre :
+      * ``user_id IS NULL`` sur les tables de tenancy (données mono-user
+        historiques ET lignes créées entre les Phases B et C, où les services
+        n'écrivent pas encore user_id) ;
+      * l'amorçage de ``user_watched_offers``/``user_watched_stores`` depuis les
+        flags dénormalisés ``is_watched`` des lignes partagées.
+    Renvoie le nombre de lignes rattachées (télémétrie de migration).
+    """
+    from sqlalchemy import text as _text
+
+    admin_id = db.execute(_text(
+        "SELECT id FROM users WHERE role = 'admin' ORDER BY id LIMIT 1"
+    )).scalar()
+    if admin_id is None:
+        logger.warning("backfill_multiuser : aucun admin — backfill différé.")
+        return 0
+
+    total = 0
+    for table in _TENANCY_TABLES:
+        res = db.execute(_text(
+            f"UPDATE {table} SET user_id = :uid WHERE user_id IS NULL"
+        ), {"uid": admin_id})
+        total += res.rowcount or 0
+
+    # Watch-intent : les flags mono-user deviennent des lignes per-user (admin).
+    db.execute(_text(
+        "INSERT INTO user_watched_offers (user_id, offer_id, watch_tier) "
+        "SELECT :uid, ro.id, COALESCE(ro.watch_tier, 'normal') FROM retail_offers ro "
+        "WHERE ro.is_watched = 1 AND NOT EXISTS ("
+        "  SELECT 1 FROM user_watched_offers uwo "
+        "  WHERE uwo.user_id = :uid AND uwo.offer_id = ro.id)"
+    ), {"uid": admin_id})
+    db.execute(_text(
+        "INSERT INTO user_watched_stores (user_id, store_id) "
+        "SELECT :uid, sl.id FROM store_locations sl "
+        "WHERE sl.is_watched = 1 AND NOT EXISTS ("
+        "  SELECT 1 FROM user_watched_stores uws "
+        "  WHERE uws.user_id = :uid AND uws.store_id = sl.id)"
+    ), {"uid": admin_id})
+    db.commit()
+    if total:
+        logger.info("backfill_multiuser : %s lignes rattachées à l'admin.", total)
+    return total

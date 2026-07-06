@@ -19,6 +19,11 @@ class Transaction(Base):
     __tablename__ = "transactions"
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    #: Propriétaire (multi-user Phase B). Nullable tant que la Phase C n'a pas
+    #: threadé user_id dans les services ; re-backfillé puis NOT NULL ensuite.
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
     tx_type: Mapped[str] = mapped_column(String(16), nullable=False)
     product_id: Mapped[int | None] = mapped_column(
         BigInteger, ForeignKey("products.id", ondelete="SET NULL"), nullable=True

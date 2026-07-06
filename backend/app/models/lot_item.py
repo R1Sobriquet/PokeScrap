@@ -15,6 +15,11 @@ class LotItem(Base):
     __tablename__ = "lot_items"
 
     id: Mapped[int] = mapped_column(BigIntPK, primary_key=True, autoincrement=True)
+    #: Propriétaire (multi-user Phase B). Nullable tant que la Phase C n'a pas
+    #: threadé user_id dans les services ; re-backfillé puis NOT NULL ensuite.
+    user_id: Mapped[int | None] = mapped_column(
+        BigInteger, ForeignKey("users.id", ondelete="CASCADE"), nullable=True
+    )
     lot_id: Mapped[int] = mapped_column(
         BigInteger, ForeignKey("lots.id", ondelete="CASCADE"), nullable=False
     )
